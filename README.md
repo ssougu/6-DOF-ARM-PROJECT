@@ -174,6 +174,7 @@ docs/                    design decisions and hand-off briefs
 | [docs/CONTROLLER_ARCHITECTURE.md](docs/CONTROLLER_ARCHITECTURE.md) | Where control runs, the Teensy 4.1 decision, migration phases |
 | [docs/VISION_APPROACH.md](docs/VISION_APPROACH.md) | Camera mount, calibration, and the error budget |
 | [docs/J2_DESIGN_BRIEF.md](docs/J2_DESIGN_BRIEF.md) | Hand-off to mechanical: encoder provision, stiffness targets |
+| [docs/PARTS_LIST.md](docs/PARTS_LIST.md) | What to buy, what's already owned, what's still undecided |
 
 ---
 
