@@ -1,0 +1,4 @@
+timestamp,test,note,kp_scale,kd_scale,vel_limit,accel_limit,n,seed,ref_rev,min_deg,max_deg,lo_rev,hi_rev,moves,mean_abs_err_deg,worst_err_deg,std_err_deg,elapsed_s,dir_split_deg,ref_spread_deg,ref_mean_err_deg
+2026-08-26T23:03:58,random,random motion baseline,1.0,1.0,0.25,1.0,20,42,0.0,5.0,381.6,-0.53,0.53,20,0.1886,-0.4223,0.2333,87.3,0.2292,0.3625,0.0481
+2026-08-26T23:07:44,random,random motion baseline,1.0,1.0,0.25,1.0,20,42,0.0,5.0,381.6,-0.53,0.53,20,0.1932,-0.4223,0.2282,87.3,0.2363,0.3735,0.0621
+2026-08-26T23:46:26,random,random motion baseline,1.0,1.0,0.25,1.0,20,42,0.0,5.0,381.6,-0.53,0.53,20,0.1807,-0.4173,0.2168,87.2,0.2193,0.3516,0.0618

@@ -1,0 +1,33 @@
+# warmup.txt -- run this first each session.
+#
+# Gentle, symmetric, slow. Wakes both joints, exercises each direction once,
+# returns home. If anything sounds/looks wrong here, stop before the bigger
+# routines. Angles are OUTPUT degrees.
+#
+#   python arm.py --j2-port COM3 --route routines/warmup.txt
+#   or, in arm_console.py:  route routines/warmup.txt
+
+speed 0.30
+
+echo J1 both directions
+movej 1  20
+wait 0.6
+movej 1 -20
+wait 0.6
+movej 1  0
+wait 0.4
+
+echo J2 both directions
+movej 2  15
+wait 0.6
+movej 2 -15
+wait 0.6
+movej 2  0
+wait 0.4
+
+echo both together, slow
+move  15  10
+wait 0.5
+move -15 -10
+wait 0.5
+home

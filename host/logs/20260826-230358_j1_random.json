@@ -1,0 +1,42 @@
+{
+  "timestamp": "2026-08-26T23:03:58",
+  "joint_id": 1,
+  "test": "random",
+  "note": "random motion baseline",
+  "conditions": {
+    "kp_scale": 1.0,
+    "kd_scale": 1.0,
+    "ilimit_scale": 1.0,
+    "max_torque": 1.0,
+    "vel_limit": 0.25,
+    "accel_limit": 1.0,
+    "configured": {
+      "motor_position.rotor_to_output_ratio": "0.0666667",
+      "servo.pid_position.ilimit": "0.5",
+      "servo.pid_position.kd": "4.5",
+      "servo.pid_position.ki": "200.0",
+      "servo.pid_position.kp": "225.0",
+      "servopos.position_max": "0.55",
+      "servopos.position_min": "-0.55"
+    }
+  },
+  "params": {
+    "n": 20,
+    "seed": 42,
+    "ref_rev": 0.0,
+    "min_deg": 5.0,
+    "max_deg": 381.6,
+    "lo_rev": -0.53,
+    "hi_rev": 0.53
+  },
+  "metrics": {
+    "moves": 20,
+    "mean_abs_err_deg": 0.1886,
+    "worst_err_deg": -0.4223,
+    "std_err_deg": 0.2333,
+    "elapsed_s": 87.3,
+    "dir_split_deg": 0.2292,
+    "ref_spread_deg": 0.3625,
+    "ref_mean_err_deg": 0.0481
+  }
+}

@@ -1,0 +1,33 @@
+# demo -- coordinated J1 + J2 motion, gentle and symmetric.
+#
+# J2 angles are kept small: its zero and sign are placeholders until the
+# shoulder gearbox exists and the joint is homed. Before running this on
+# hardware, in arm_console.py:  place the arm at home by hand, then
+#   zero all yes
+#
+# run it with:   python arm.py --sim --route routines/demo.txt
+#           or:   arm_console.py  ->  route routines/demo.txt
+
+speed 0.4
+
+# sweep the base with the shoulder slightly down
+move  25 -12
+wait 0.5
+move -25 -12
+wait 0.5
+move   0 -12
+wait 0.5
+
+# "reach": shoulder forward, then part way back, base centred
+movej 2 -25
+wait 0.5
+movej 2 -8
+wait 0.5
+
+# small coordinated diagonal, both directions
+move  18 -20
+wait 0.4
+move -18 -6
+wait 0.4
+
+home

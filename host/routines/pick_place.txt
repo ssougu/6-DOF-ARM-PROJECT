@@ -1,0 +1,99 @@
+# pick_place.txt -- simulated pick-and-place cycle, x3.
+#
+# Mimics how the real demo will move: fast travel between poses, slow and
+# deliberate into a pick/place, a dwell where a gripper would open or close,
+# reversals of direction, then home. No gripper yet -- the dwells are just
+# time.
+#
+# Angles are OUTPUT degrees. Tuned conservative; once you've watched a full
+# cycle, scale the pose angles up. J2 is still a bare motor (GEAR_RATIO=15
+# placeholder) so its "degrees" are 15x at the shaft -- keep J2 modest.
+#
+#   python arm.py --j2-port COM3 --route routines/pick_place.txt
+
+echo --- cycle start, home ---
+speed 0.8
+home
+wait 0.5
+
+echo reach to pick side (fast travel)
+speed 0.85
+move -45 -10
+wait 0.3
+
+echo descend into pick (slow, precise)
+speed 0.25
+move -45 -28
+wait 0.8                 # gripper would CLOSE here
+
+echo lift (slow)
+speed 0.30
+move -45 -8
+wait 0.3
+
+echo traverse to place side (fast, big direction change)
+speed 0.90
+move 50 -8
+wait 0.3
+
+echo line up over place (medium)
+speed 0.45
+move 50 -18
+wait 0.2
+
+echo lower into place (slow)
+speed 0.22
+move 50 -30
+wait 0.8                 # gripper would OPEN here
+
+echo retract (slow) then home (fast)
+speed 0.30
+move 50 -12
+wait 0.3
+speed 0.85
+home
+wait 0.8
+
+echo --- cycle 2 ---
+speed 0.85
+move -45 -10
+wait 0.3
+speed 0.25
+move -45 -28
+wait 0.8
+speed 0.30
+move -45 -8
+wait 0.3
+speed 0.90
+move 50 -8
+wait 0.3
+speed 0.22
+move 50 -30
+wait 0.8
+speed 0.85
+move 50 -12
+wait 0.3
+home
+wait 0.8
+
+echo --- cycle 3, faster ---
+speed 1.0
+move -45 -10
+wait 0.2
+speed 0.35
+move -45 -28
+wait 0.6
+speed 1.0
+move -45 -8
+wait 0.2
+move 50 -8
+wait 0.2
+speed 0.35
+move 50 -30
+wait 0.6
+speed 1.0
+move 50 -12
+wait 0.2
+home
+
+echo --- done ---

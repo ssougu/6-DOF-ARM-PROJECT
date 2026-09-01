@@ -1,0 +1,11 @@
+.pio/
+__pycache__/
+*.pyc
+.venv/
+
+# ui (Tauri + SvelteKit)
+node_modules/
+ui/build/
+ui/.svelte-kit/
+ui/src-tauri/target/
+ui/src-tauri/gen/

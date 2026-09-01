@@ -1,0 +1,105 @@
+# workout.txt -- stress routine: big sweeps, hard reversals, speed changes,
+# then a repeatability check.
+#
+# This is the aggressive one. Watch the first full pass before you leave it
+# running. Blank line = e-stop. Angles are OUTPUT degrees -- raise the
+# extremes only after a clean pass.
+#
+#   python arm.py --j2-port COM3 --route routines/workout.txt
+
+echo === progressive J1 sweeps ===
+speed 0.6
+home
+wait 0.4
+movej 1  30
+wait 0.3
+movej 1 -30
+wait 0.3
+movej 1  55
+wait 0.3
+movej 1 -55
+wait 0.3
+movej 1  75
+wait 0.3
+movej 1 -75
+wait 0.3
+movej 1  0
+wait 0.5
+
+echo === progressive J2 sweeps ===
+speed 0.5
+movej 2  20
+wait 0.3
+movej 2 -20
+wait 0.3
+movej 2  35
+wait 0.3
+movej 2 -35
+wait 0.3
+movej 2  0
+wait 0.5
+
+echo === coordinated diagonals, alternating (hard reversals) ===
+speed 0.8
+move  60  30
+wait 0.25
+move -60 -30
+wait 0.25
+move  60 -30
+wait 0.25
+move -60  30
+wait 0.25
+move  60  30
+wait 0.25
+move -60 -30
+wait 0.25
+home
+wait 0.5
+
+echo === speed ramp on a fixed sweep ===
+speed 0.3
+move  45  20
+wait 0.2
+move -45 -20
+wait 0.2
+speed 0.6
+move  45  20
+wait 0.2
+move -45 -20
+wait 0.2
+speed 1.0
+move  45  20
+wait 0.2
+move -45 -20
+wait 0.2
+home
+wait 0.6
+
+echo === repeatability: 6x return to the same pose from a random-ish detour ===
+speed 0.9
+move  35 -15
+wait 0.4
+move -70  25
+wait 0.2
+move  35 -15
+wait 0.4
+move  10  40
+wait 0.2
+move  35 -15
+wait 0.4
+move -50 -30
+wait 0.2
+move  35 -15
+wait 0.4
+move  65  10
+wait 0.2
+move  35 -15
+wait 0.4
+move -20 -40
+wait 0.2
+move  35 -15
+wait 0.6
+
+echo === done, home ===
+speed 0.6
+home
