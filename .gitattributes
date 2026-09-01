@@ -1,0 +1,11 @@
+﻿# Normalise line endings so two machines don't produce whole-file diffs.
+* text=auto
+
+# Explicitly binary - never touch these
+*.png  binary
+*.ico  binary
+*.icns binary
+*.stl  binary
+*.step binary
+*.f3d  binary
+*.pdf  binary
