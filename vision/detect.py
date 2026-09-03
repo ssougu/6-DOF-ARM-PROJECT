@@ -143,6 +143,56 @@ class Detector:
         }
 
 
+def stability(det, cam, n=120, classes=None, label=None, settle=15):
+    """How still is the detected ground point on a STATIONARY object?
+
+    This is perception repeatability in pixels -- the same kind of number as
+    J1's 0.36 deg, and the direct precursor to the mm error budget. Nothing
+    here needs calibration: once intrinsics exist, px converts to mm.
+
+    Reports detection *rate* separately from jitter, because they are
+    different failure modes. A box that is rock steady in the 60% of frames
+    where it appears is not a usable detection; neither is one found every
+    frame that wanders 30 px. Both must be good.
+    """
+    cam._settle(settle)
+    pts, confs, sizes = [], [], []
+    misses = 0
+    for _ in range(n):
+        ok, frame = cam.read()
+        if not ok:
+            continue
+        ds = det.detect(frame, classes=classes)
+        if label:
+            ds = [d for d in ds if d.label == label]
+        if not ds:
+            misses += 1
+            continue
+        d = max(ds, key=lambda x: x.conf)          # the confident one
+        pts.append(d.ground_px)
+        confs.append(d.conf)
+        sizes.append((d.xyxy[2] - d.xyxy[0], d.xyxy[3] - d.xyxy[1]))
+
+    seen = len(pts)
+    if seen < 2:
+        return {"frames": n, "seen": seen, "rate": seen / max(n, 1)}
+
+    p = np.array(pts)
+    s = np.array(sizes)
+    step = np.linalg.norm(np.diff(p, axis=0), axis=1)   # frame-to-frame move
+    return {
+        "frames": n, "seen": seen, "misses": misses, "rate": seen / n,
+        "conf_mean": float(np.mean(confs)), "conf_min": float(np.min(confs)),
+        "ground_std_px": (float(np.std(p[:, 0])), float(np.std(p[:, 1]))),
+        # Radial spread about the mean: one number for "how still is it".
+        "ground_rms_px": float(np.sqrt(np.mean(
+            np.sum((p - p.mean(axis=0)) ** 2, axis=1)))),
+        "worst_jump_px": float(step.max()),
+        "box_std_px": (float(np.std(s[:, 0])), float(np.std(s[:, 1]))),
+        "box_mean_px": (float(np.mean(s[:, 0])), float(np.mean(s[:, 1]))),
+    }
+
+
 def draw(frame, dets):
     import cv2
     for d in dets:
@@ -169,7 +219,20 @@ def main():
     p.add_argument("--live", action="store_true")
     p.add_argument("--image")
     p.add_argument("--index", type=int, default=0, help="camera index")
+    p.add_argument("--list-classes", action="store_true",
+                   help="print the COCO classes YOLO already knows")
+    p.add_argument("--label", help="keep only this class, e.g. 'bottle'")
+    p.add_argument("--stability", action="store_true",
+                   help="jitter of the ground point on a stationary object")
     args = p.parse_args()
+
+    if args.list_classes:
+        from ultralytics import YOLO
+        names = YOLO(str(args.weights)).names
+        for i in range(0, len(names), 4):
+            print("  " + "".join(f"{j:>4} {names[j]:<18}"
+                                 for j in range(i, min(i + 4, len(names)))))
+        return
 
     det = Detector(args.weights, args.device, args.conf, args.imgsz, args.half)
     print(f"YOLO11m on {det.device_name}"
@@ -184,12 +247,49 @@ def main():
         print(f"  worst  {s['worst_ms']:.1f} ms")
         return
 
+    if args.stability:
+        from camera import Camera
+        det.warmup()
+        with Camera(args.index) as cam:
+            print(f"\n  hold still -- {args.n} frames"
+                  + (f", class '{args.label}'" if args.label else ""))
+            s = stability(det, cam, args.n, label=args.label)
+        if s["seen"] < 2:
+            print(f"  seen in {s['seen']}/{s['frames']} frames -- nothing to "
+                  f"measure. Is the object in view and lit?")
+            return
+        gx, gy = s["ground_std_px"]
+        bw, bh = s["box_mean_px"]
+        sw, sh = s["box_std_px"]
+        print(f"\n  detected in {s['seen']}/{s['frames']} frames "
+              f"({s['rate']*100:.0f}%)")
+        print(f"  confidence     mean {s['conf_mean']:.2f}   "
+              f"min {s['conf_min']:.2f}")
+        print(f"  ground point   rms {s['ground_rms_px']:.2f} px   "
+              f"(x {gx:.2f}, y {gy:.2f})")
+        print(f"  worst jump     {s['worst_jump_px']:.2f} px")
+        print(f"  box            {bw:.0f}x{bh:.0f} px, "
+              f"std {sw:.1f}x{sh:.1f}")
+        print()
+        if s["rate"] < 0.95:
+            print("  ! dropping frames. An object the detector loses is an")
+            print("    object the arm will reach for and miss. More light,")
+            print("    less clutter, or a different object.")
+        if s["ground_rms_px"] > 5:
+            print("  ! ground point is wandering. Often the box breathing")
+            print("    around a soft edge -- check it is not partly occluded.")
+        print("  px here becomes mm once intrinsics exist; this is the")
+        print("  perception half of the error budget.")
+        return
+
     import cv2
     if args.image:
         frame = cv2.imread(args.image)
         if frame is None:
             raise SystemExit(f"could not read {args.image}")
         dets = det.detect(frame)
+        if args.label:
+            dets = [d for d in dets if d.label == args.label]
         for d in dets:
             print(f"  {d.label:<14} {d.conf:.2f}  ground_px="
                   f"({d.ground_px[0]:.0f}, {d.ground_px[1]:.0f})")
@@ -207,6 +307,8 @@ def main():
                 if not ok:
                     break
                 dets = det.detect(frame)
+                if args.label:
+                    dets = [d for d in dets if d.label == args.label]
                 cv2.imshow("detect", draw(frame, dets))
                 if cv2.waitKey(1) & 0xFF in (ord("q"), 27):
                     break

@@ -109,6 +109,45 @@ Then:
 python locate.py --detect        # YOLO objects, located on the table in mm
 ```
 
+## Without a printed board
+
+Calibration needs the board, but choosing and characterising the demo object
+does not — and that decision gets expensive late, so make it early.
+
+```bash
+python detect.py --list-classes            # the 80 COCO classes, free
+python detect.py --live --label bottle     # does it hold on your object?
+python detect.py --stability --label bottle --n 200
+```
+
+**Pick a COCO class.** YOLO11m already knows `bottle`, `cup`, `bowl`, `apple`,
+`banana`, `orange`, `sports ball`, `mouse`, `cell phone`, `book`, `scissors`.
+Anything outside those 80 means collecting and training a custom dataset —
+weeks. Choosing an object the model already knows is the single biggest
+schedule saving available in perception.
+
+**`--stability` is perception repeatability, in pixels.** Put the object
+down, don't touch it, and measure how much the detected ground point wanders.
+It is the same kind of number as J1's 0.36°, and once intrinsics exist it
+converts straight to millimetres — so it is the perception half of the error
+budget, measurable today.
+
+It reports detection *rate* and jitter separately because they fail
+differently. A box that is rock-steady in the 60% of frames where it appears
+is not usable; neither is one found every frame that wanders 30 px.
+
+Worth testing while you are there, all of it board-free:
+
+- **Each candidate object**, and keep the one that detects most reliably.
+- **Object shape vs the ground-point assumption.** Bottom-centre of the box is
+  taken as the contact point. That is true for a bottle or a ball; a mug with a
+  handle has a box skewed by the handle, so its bottom-centre is not under the
+  object's centre. This biases every grasp, and it is cheaper to pick a
+  friendlier object than to correct for it.
+- **Lighting.** Re-run under the lighting the fair will actually have.
+- **Distance and clutter.** Where does the rate fall off?
+- **Pose.** Bottle upright vs on its side — confidence often differs a lot.
+
 ## Notes
 
 - **`--plane-offset`** is the mounting thickness: positive means the real
