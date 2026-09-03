@@ -164,11 +164,25 @@ and it is the workstream least coupled to anything else.
   keeps warning about, committed in new code. Now an fd-level stderr redirect,
   scoped to the scan, with the restore verified.
 
+**Then the camera came on, and `--lock` produced a near-black image:**
+- **My bug.** `lock()` switched auto-exposure off without supplying a value,
+  so the driver fell back to its manual default — a very short exposure. Now
+  it lets auto converge, reads the value it chose, pins that, then *checks the
+  resulting picture* and backs out to auto if the driver ignored it (this
+  webcam does). Final image 138/255.
+- **`Locked.ok` was wrong in principle**, requiring both focus and exposure.
+  Focus changes the intrinsics; exposure does not move a pixel geometrically.
+  A well-exposed auto frame beats a pinned dark one, so `ok` is focus-only.
+- **`AUTOFOCUS` returning −1 is ambiguous** — no control exposed covers both
+  "fixed-focus lens, nothing to pin" and "autofocus we cannot stop". The
+  property cannot distinguish them, so it now watches Laplacian sharpness over
+  ~2 s. **This laptop's webcam reads as fixed-focus (cv ~1–3%) and is safe to
+  calibrate.**
+- Webcams also stream dark for a few hundred ms after opening, so the first
+  measurements described the ramp rather than the camera. Settles added.
+
 **Not done — and it matters:**
-- **No part of this has seen a real camera.** The maths is proven; the capture
-  path, focus locking against an actual driver, and calibration quality are
-  all untested. Deliberately not run: turning on the webcam unattended is not
-  mine to do.
+- Calibration quality against a real board is still unmeasured.
 - No board printed yet, so no intrinsics, so no real mm number.
 
 **Next:**

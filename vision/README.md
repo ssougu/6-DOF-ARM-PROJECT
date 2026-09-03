@@ -56,11 +56,28 @@ python camera.py --list
 python camera.py --index 0 --lock
 ```
 
-If it says `NOT PINNED`, that camera cannot be calibrated meaningfully.
-Autofocus changes the intrinsics continuously, so a calibration taken at one
-focus stops being true at another — and the symptom is results that drift for
-no visible reason. Windows drivers accept property writes and silently ignore
-them, so everything here is read back rather than assumed.
+**Focus is what matters, not exposure.** Focus changes the intrinsics, so a
+calibration taken at one focus stops being true at another — and the symptom
+is results that drift for no visible reason. Exposure moves no pixel
+geometrically; it only costs image quality and consistency. A well-exposed
+auto frame beats a pinned dark one, so `ok` reports focus alone.
+
+The `AUTOFOCUS` property returning −1 is **ambiguous** — it means the driver
+exposes no control, which covers both a fixed-focus lens (nothing to pin,
+calibrate away) and autofocus that cannot be switched off (useless). The
+property cannot tell them apart, so `camera.py` watches Laplacian sharpness
+over a couple of seconds instead: a lens that hunts varies, a fixed lens does
+not. **Keep the scene still while it measures.**
+
+On this laptop's built-in webcam: sharpness cv ~1–3%, so it reads as
+fixed-focus and is safe to calibrate.
+
+Exposure is trickier. Switching to manual *without* supplying a value leaves
+the driver on its manual default, which is usually a near-black frame — if
+your image suddenly goes dark, that is why. `lock()` now lets auto converge,
+takes the value it chose, and pins that; if the driver ignores manual exposure
+entirely (this laptop's does), it detects that and stays on auto rather than
+handing you a black picture. Just avoid changing the lighting mid-calibration.
 
 **3. Calibrate.**
 
