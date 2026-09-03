@@ -1,8 +1,10 @@
 # Host tools — user guide
 
-Everything in `host/`. Positions are **output revolutions** internally,
-**degrees** in anything you see. `python` = your 3.12 venv with
-`pip install moteus pyserial`.
+Everything in `host/` and `vision/`. Positions are **output revolutions**
+internally, **degrees** in anything you see; vision works in **millimetres**,
+set by the printed board's square size. `python` = your 3.12 install with
+`moteus pyserial websockets`, plus `torch ultralytics opencv-python` for
+vision.
 
 Ports on this rig: **COM7** = moteus (J1, mjcanfd-usb), **COM3** = J2 ESP32.
 Windows serial ports are exclusive — one program per port at a time.
@@ -31,6 +33,12 @@ server, or `Get-Process python | Stop-Process -Force`.
 | Open the desktop GUI | `npm run tauri dev` in `ui/` |
 | Run the control server alone | `python arm_server.py --sim` |
 | Flash J2 firmware | `pio run -t upload` in `firmware/j2_stepper` |
+| Prove the vision stack (no camera) | `python check_vision.py` in `vision/` |
+| See what YOLO can already detect | `python detect.py --list-classes` |
+| Check an object detects reliably | `python detect.py --stability --label bottle` |
+| Get the printable calibration board | `python board.py` |
+| Calibrate a camera | `python calibrate.py --index 0 --lock --tag webcam` |
+| Turn a pixel into table millimetres | `python locate.py --ruler` |
 
 ---
 
@@ -293,3 +301,93 @@ out of every move — the other joint keeps working.
 
 Without Tauri you can run the same UI in a browser: `npm run dev` in `ui/`
 plus `python arm_server.py --sim`, then open `http://localhost:1420`.
+
+---
+
+## vision/ — perception
+
+Runs on the laptop and needs no arm, which is why it can be built while the
+mechanical side is in CAD. `vision/README.md` has the full detail; this is the
+operating summary. Design rationale is in `VISION_APPROACH.md`.
+
+Start with the self-check — it needs no camera and no board:
+
+```
+cd vision
+python check_vision.py
+```
+
+Eight checks: CUDA, OpenCV ChArUco, board geometry, the YOLO weights, the
+model genuinely landing on the GPU, inference latency, and ray-plane
+localisation recovering known millimetres from synthetic pixels. Non-zero
+exit on failure.
+
+| File | Does |
+|---|---|
+| `board.py` | Defines the ChArUco board once; renders it for printing |
+| `camera.py` | Opens a camera, pins focus/exposure, reports what the driver *actually* did |
+| `calibrate.py` | Intrinsics from board views + a coverage score → `intrinsics_*.json` |
+| `detect.py` | YOLO11m on CUDA; boxes, ground points, stability, benchmarks |
+| `locate.py` | **pixel → table millimetres**, by ray–plane |
+| `check_vision.py` | Self-check, PASS/FAIL |
+
+Localisation is **ray–plane, not stereo depth**: the board defines the table
+plane, a pixel defines a ray, the object is where they meet. No depth, so a
+plain webcam suffices, and it survives the textureless and shiny objects that
+break stereo.
+
+### Without a printed board
+
+```
+python detect.py --list-classes                       # the 80 COCO classes
+python detect.py --live --label bottle                # eyeball it
+python detect.py --stability --label bottle --n 200   # repeatability, in px
+```
+
+**Pick a class YOLO already knows.** Anything outside COCO's 80 means
+collecting and training a dataset — the largest avoidable schedule risk in
+perception.
+
+`--stability` measures how far the detected ground point wanders on a
+stationary object. It is perception repeatability in pixels — the analogue of
+J1's 0.36° — and converts to millimetres once intrinsics exist. Detection
+*rate* is reported separately from jitter because they fail differently.
+
+### With a board, in order
+
+1. `python board.py`, print at **exactly 100%**. Measure across all 7 squares
+   and divide by 7. If it is not 25 mm, do not reprint — pass the measured
+   value as `--squares-mm`. Glue it flat and rigid; matte paper.
+2. `python camera.py --index 0 --lock` — keep the scene still while it runs.
+   You want `focus: locked` and a mean level near 100–150.
+3. `python calibrate.py --index 0 --lock --tag webcam` — SPACE keeps a view,
+   `c` calibrates. 16–20 views: tilt to 30–45°, vary distance, fill the frame
+   corners, include some half out of frame. Coverage 60%+ before calibrating.
+   Rest the board on something before pressing SPACE; motion blur degrades
+   corners quietly.
+4. `python locate.py --ruler` — click two points a known distance apart and
+   compare against a real ruler.
+
+**Step 4 is the deliverable.** Reprojection error only says the model fits
+the views you gave it; the ruler says whether the millimetres are right.
+
+### Things that look fine and are not
+
+- **A scaled print.** Print at 97% and the solver absorbs it into the focal
+  length: the residual is *perfect* and every distance is 3% wrong for ever.
+  Nothing in the software can detect this. Calipers can.
+- **Low reprojection error with thin coverage.** Twenty views from one spot
+  fit beautifully and generalise badly. `calibrate.py` scores coverage and
+  complains under 60%.
+- **`AUTOFOCUS` returning −1.** Ambiguous: it covers both a fixed-focus lens
+  (fine) and autofocus that cannot be switched off (useless). `camera.py`
+  decides by watching sharpness instead. This laptop's webcam reads as
+  fixed-focus at cv ~1–3% and is safe.
+- **Locking exposure without a value.** The driver falls back to its manual
+  default — usually near-black. `camera.py` lets auto converge, pins that, and
+  backs out to auto if the driver ignores manual exposure (this one does).
+- **Intrinsics at the wrong resolution.** They do not transfer. `locate.py`
+  refuses to run rather than silently rescaling.
+- **Box centre as the grasp point.** The bottom-centre is used instead: that
+  is where the object meets the table. Box centre floats about half the
+  object's height above it and biases every grasp toward the camera.

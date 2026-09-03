@@ -54,7 +54,8 @@ pick it up. Reliably, repeatedly, on request.
 │   ├── board.py                the ChArUco board, defined once + printable
 │   ├── camera.py               capture; pins focus/exposure and verifies it
 │   ├── calibrate.py            intrinsics + coverage score → intrinsics_*.json
-│   ├── detect.py               YOLO11m on CUDA → boxes + ground point
+│   ├── detect.py               YOLO11m on CUDA → boxes + ground point;
+│   │                           --stability = repeatability in px, no board
 │   ├── locate.py               pixel → table mm by ray-plane; --ruler tests it
 │   └── models/                 yolo11m.pt (GITIGNORED, re-downloadable)
 ui/                             Tauri v2 + SvelteKit desktop control panel
@@ -254,6 +255,8 @@ python host/test_arm_server.py                    # protocol test suite
 # vision (needs no arm, no camera for the self-check)
 cd vision
 python check_vision.py                            # 8 checks, PASS/FAIL
+python detect.py --list-classes                   # the 80 COCO classes, free
+python detect.py --stability --label bottle       # detection repeatability, px
 python board.py                                   # printable ChArUco board
 python camera.py --list                           # what cameras exist
 python camera.py --index 0 --lock                 # can this camera hold still?

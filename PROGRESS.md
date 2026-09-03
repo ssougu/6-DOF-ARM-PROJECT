@@ -123,6 +123,65 @@ its live path is still unexercised.
 
 ---
 
+## 2026-09-03 — vision verified on the real camera; detection characterisable
+              without a board
+
+**Focus:** get the perception stack off synthetic tests and onto the actual
+webcam, and find useful work that is not blocked on printing a board.
+
+**Done:**
+- **Camera path validated on hardware.** `camera.py --index 0 --lock` gives
+  1280x720 as requested, focus reported usable, mean level 133/255.
+- **The laptop webcam is fixed-focus, and that is a real result.** `AUTOFOCUS`
+  returns −1, which is ambiguous — it covers both "fixed lens, nothing to pin"
+  and "autofocus we cannot stop". Now decided by watching Laplacian sharpness
+  for ~2 s instead of trusting the property. Measured **cv 0.6 / 1.4 / 2.9%
+  across three runs**, well under the 6% threshold. **The built-in webcam is
+  safe to calibrate**, so the RealSense is not needed for bring-up.
+- **`detect.py` gained `--list-classes`, `--label` and `--stability`.**
+  `--stability` measures how far the detected ground point wanders on a
+  stationary object: perception repeatability in pixels, the analogue of J1's
+  0.36°, convertible to mm once intrinsics exist. Detection *rate* is reported
+  separately from jitter — a box steady in 60% of frames is not usable, and
+  neither is one found every frame that wanders 30 px.
+- **`board.py` guidance corrected.** It had said to measure one square and
+  reprint if it was off. Both wrong: measuring across all 7 and dividing puts
+  the same caliper error on a 7× larger number, and a uniformly scaled print
+  needs no reprint at all — pass the measured value to `--squares-mm`. What is
+  fatal is using the nominal number when it is wrong, because that error never
+  shows in the reprojection residual.
+- **Documentation:** `vision/` now has a full section in `TOOLS_USER_GUIDE.md`
+  (operating summary, bring-up order, and the "looks fine and is not" list),
+  quick-reference rows, and updated CLAUDE.md layout/commands.
+
+**Outcomes / data:**
+- **Ground-point stability: rms 0.65 px, worst frame-to-frame jump 0.68 px,
+  100% detection over 40 frames** (static scene, conf 0.93). Encouraging: if
+  the demo object lands near this, perception jitter will not be what limits
+  the grasp. Not yet on the real demo object.
+- `check_vision.py` 8/8 throughout.
+
+**Problems hit:**
+- Nothing broke. The `--lock` darkness from last night was already fixed.
+
+**Blocked:**
+- **No printer access today**, so no board, no intrinsics, no mm number. Every
+  distance claim is still unverified against physical reality.
+
+**Next:**
+- **Pick the demo object from COCO's 80** and characterise it with
+  `--stability`. Anything outside those classes means collecting and training
+  a dataset — the largest avoidable schedule risk in perception, and the
+  decision gets costly late.
+- Print the board, then calibrate, then `locate.py --ruler`. That mm number
+  is the perception deliverable.
+- **The gripper is still unowned** (open question 8) and the object choice
+  constrains it directly — jaw width, stroke, cylinder-on-its-side or not.
+  Worth settling in the same sitting as the object.
+**Time:** ~1.5h   **Who:** —
+
+---
+
 ## 2026-09-02 (evening) — perception stack stood up; runs without the arm
 
 **Focus:** J2 is blocked on mechanical, so start the half of the demo that
