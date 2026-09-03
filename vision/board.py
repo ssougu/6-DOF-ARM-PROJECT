@@ -16,9 +16,14 @@ arm, which a checkerboard does not.
 *** PRINTING: scale must be exactly 100%. ***
 "Fit to page" silently shrinks the sheet by a few percent, and every distance
 you measure afterwards is wrong by that factor -- a scale error is invisible in
-the reprojection residual, so calibration will look excellent and the arm will
-consistently miss. Print it, then measure a square with calipers and check it
-against the number this script prints. Do not skip that check.
+the reprojection residual, so calibration looks excellent and the arm
+consistently misses.
+
+Measure the print across the whole row of squares and divide, rather than
+measuring one square: the same caliper error then lands on a number seven
+times larger. If it comes out slightly off, do not reprint -- pass the
+measured size to calibrate.py. What matters is that the number the code uses
+is true, not that it is round.
 """
 
 import argparse
@@ -77,11 +82,25 @@ def main():
           f"{'fits' if bw <= 190 and bh <= 277 else 'DOES NOT fit'} with margins")
     print()
     print("  PRINT AT EXACTLY 100% SCALE -- no 'fit to page', no 'shrink to")
-    print("  printable area'. Then measure one square with calipers:")
-    print(f"    it must be {args.squares_mm:g} mm. If it is not, re-print;")
-    print("    a scale error here silently corrupts every distance later.")
-    print("  Then glue it to something rigid. A board that bows is a board")
-    print("  whose plane is not a plane.")
+    print("  printable area'.")
+    print()
+    print(f"  THEN MEASURE IT. Span all {SQUARES_X} squares across the long")
+    print(f"  edge -- nominally {bw:.0f} mm -- and divide by {SQUARES_X}. Measuring")
+    print("  one square multiplies your caliper error by the same factor;")
+    print("  measuring across the whole row divides it.")
+    print()
+    print("  You do NOT need to reprint if it comes out slightly off. The")
+    print("  square size only has to match reality -- pass what you measured:")
+    print(f"      python calibrate.py --squares-mm <measured>   "
+          f"(nominal {args.squares_mm:g})")
+    print("  A uniformly scaled print is fine. Believing the nominal number")
+    print("  when it is wrong is not: that error is invisible in the")
+    print("  reprojection residual and scales every distance for ever after.")
+    print()
+    print("  Then glue it to something rigid and FLAT. A board that bows is a")
+    print("  board whose plane is not a plane, and ray-plane assumes it is.")
+    print("  Matte paper if you have it -- glossy throws glare that stops the")
+    print("  markers being detected under a desk lamp.")
 
 
 if __name__ == "__main__":
