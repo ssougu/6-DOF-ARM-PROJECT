@@ -176,6 +176,23 @@ async def main():
         print("  arm clears the e-stop latch")
 
         await c.ok("disarm")
+
+        # --- shutdown (must be last: it ends the server) -----------
+        # The UI sends this before restarting in the other mode, so it has to
+        # de-energize and then actually exit -- not just ack.
+        await c.ok("arm")
+        await c.fresh()
+        assert c.state["armed"], "precondition: armed before shutdown"
+        await c.ok("shutdown")
+        closed = False
+        for _ in range(60):
+            await asyncio.sleep(0.1)
+            if c.ws.close_code is not None:
+                closed = True
+                break
+        assert closed, "server did not close the connection after shutdown"
+        print("  shutdown de-energized and closed the server")
+
         print("\nARM SERVER OK")
 
 

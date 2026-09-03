@@ -72,7 +72,9 @@ output encoder). Nothing in this arm is truly open-loop, which is why a
 non-real-time host is survivable.
 
 **Reductions:** J1 is 15:1 printed herringbone planetary. J2's is in progress
-(firmware `GEAR_RATIO` is still the placeholder 15). J3–J6 not designed.
+(firmware `GEAR_RATIO` is **1.0** — bare motor, matching what is actually
+bolted on; set it to the real ratio when the gearbox goes on). J3–J6 not
+designed.
 
 ### J1 — moteus r4.11 + mj5208
 - 24V 5A dev-kit brick on XT30. Host link is mjcanfd-usb-1x, **COM7**.
@@ -186,6 +188,17 @@ bigger/faster moves. Not yet characterised properly; see PROGRESS.md.
   0.25 s. Verify safety interlocks empirically; do not assume.
 - **Trust tooth counts over hand rotation** for gear ratio. A 0.74-turn hand
   rotation produced a false 11.14:1 reading against the true 15:1.
+- **`enabled` is not `connected`.** Joints are built lazily: a spec can be
+  enabled from startup while nothing is open on its port. `active_ids` needs
+  both, so an enabled-but-unbuilt joint silently drops out of every move,
+  `zero`, and `read`. **`arm()` is what connects them** (`_ensure_built`), or
+  `enable(id)` explicitly. Cost a bench session in 2026-09-02: J2 showed a
+  green ON toggle, dead controls, and "no enabled joints to zero" about a
+  joint that was enabled. The UI now distinguishes the two states.
+- **A firmware constant describing planned hardware will read as a broken
+  sensor.** `GEAR_RATIO` sat at the intended 15 while a bare motor was on the
+  bench, so every commanded angle came out 15× too big. Constants must track
+  what is *bolted on right now*. See open question 5.
 - **Silent partial success is the dominant failure mode.** Half-saved tunes,
   config writes that report success and revert, tests that cannot fail. Add a
   verification step to anything automated.
@@ -273,9 +286,12 @@ first line — type motion commands one at a time.
    itself, so this is not silent drift — but the host has no independent
    measurement, and the reported error is fabricated (see gotchas). Wiring ALM
    closes most of this gap for one wire.
-5. **J2 `GEAR_RATIO` is a placeholder (15).** Host "output degrees" for J2 are
-   15× at the motor shaft until the gearbox exists and the real ratio goes
-   into `firmware/j2_stepper/src/main.cpp`.
+5. **J2 `GEAR_RATIO` must track what is physically fitted.** It is now `1.0`
+   (bare motor — the shaft *is* the output, so the convention holds). It sat
+   at a planned-but-unfitted 15 through the 2026-09-02 bench session, which
+   made every commanded angle come out 15× too big and read as a broken
+   degree scale. **Set it to the real ratio and reflash the moment the
+   gearbox goes on** — from tooth counts, not hand rotation.
 6. **Windows is permanent; timing jitter is still uncharacterised.** Decided
    2026-09-01 — no Linux migration. This is survivable because every actuator
    closes its own loop and the host is only a trajectory sequencer, but the

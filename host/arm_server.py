@@ -100,6 +100,7 @@ class ArmServer:
         self._route_stop = False
         self._outbox = []           # log lines waiting to be broadcast
         self._stop = None           # set to end run()
+        self._bye = None            # pending graceful-shutdown task
 
     # ---- output ----------------------------------------------------
     def log(self, msg, level="info"):
@@ -183,8 +184,12 @@ class ArmServer:
         cmd, a = c.get("cmd"), self.arm
 
         if cmd == "arm":
-            await a.arm()
+            errs = await a.arm()
             await a.hold()
+            # A joint that could not connect switched itself off; say so, or
+            # the UI just shows it flip to OFF for no visible reason.
+            for e in (errs or []):
+                self.log(f"{e} -- left disabled", "warn")
             self.log("armed + holding")
 
         elif cmd == "disarm":
@@ -253,6 +258,18 @@ class ArmServer:
                 raise RuntimeError("no route is running")
             self._route_stop = True
             self.log("stopping route after the current step")
+
+        elif cmd == "shutdown":
+            # Graceful exit, used by the UI before it restarts us in the other
+            # mode. Stops any route and de-energizes here rather than leaving
+            # it to a hard kill -- TerminateProcess skips run()'s finally, so
+            # on live hardware only moteus's 0.25 s watchdog would save us and
+            # a holding stepper would just stay energized.
+            self._route_stop = True
+            await a.stop("shutdown")
+            self.log("shutdown requested -- de-energized")
+            # Let the ack reach the client before run() tears the server down.
+            self._bye = asyncio.create_task(self._exit_soon())
 
         else:
             raise RuntimeError(f"unknown command {cmd!r}")
@@ -333,6 +350,12 @@ class ArmServer:
         finally:
             self.clients.discard(ws)
             self.log(f"client disconnected ({len(self.clients)} left)")
+
+    async def _exit_soon(self, delay=0.25):
+        """End run() after a beat, so the shutdown ack gets out first."""
+        await asyncio.sleep(delay)
+        if self._stop is not None:
+            self._stop.set()
 
     async def _parent_watch(self, pid):
         """If the app that launched us dies -- even by a hard kill -- go with

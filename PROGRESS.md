@@ -23,6 +23,106 @@ learn / what's blocked", not a changelog (git has that).
 
 ---
 
+## 2026-09-02 — first live motion from the GUI (J2); J2 degree scale was 15× off
+
+**Focus:** the GUI could only reach real hardware by relaunching with an env
+var. Make the mode switchable at runtime, make switching safe, then actually
+drive a motor with it. **J2 moved under GUI control — the first time the
+desktop app has driven real hardware.** J1 was off the bench being greased, so
+its live path is still unexercised.
+
+**Done:**
+- **Found the actual gap:** `restart_server` / `server_status` existed in
+  `ui/src-tauri/src/lib.rs` but the frontend never called `invoke` at all —
+  both were dead code. `ARM_UI_SIM=0` at launch was the only way into LIVE.
+- **`ModeSwitch.svelte`** (new) — the SIM/LIVE badge is now a button.
+  SIM→LIVE requires a second confirmation (the SIM default is the thing that
+  stops a stray click energizing a motor; a one-click toggle would undo it);
+  LIVE→SIM goes straight through. Disabled mid-route and in a browser.
+- **`shutdown` command in `arm_server.py`** — stops any route, de-energizes,
+  then ends `run()` a beat later so the ack still reaches the client.
+  Mode-switch and window-close both use it.
+- **`kill()` in Rust now takes a grace period** and prefers the server's own
+  exit: 2 s on a mode switch, 800 ms on window close. Previously always
+  `TerminateProcess`, which skips `run()`'s `finally` entirely — only the
+  moteus 0.25 s watchdog was saving J1, and a holding stepper just stayed
+  energized. Waiting also means port 8787 is free before the replacement binds
+  it (the stale-server failure from 2026-09-01).
+- **`restart_server` is now `async`** so the grace wait is off the UI thread.
+- **`snapshot()` gained `link`** — COM port for a stepper, CAN id for a
+  moteus. Shown on the joint card in LIVE only, for bring-up diagnosis.
+- **`test_arm_server.py` covers `shutdown`** — asserts it de-energizes *and*
+  that the process actually closes the connection, not just acks.
+
+**Then the bench session, and two things it caught:**
+- **`GEAR_RATIO` was 15 with no gearbox fitted, so every J2 angle came out 15×
+  too big** — a commanded 10° moved the shaft ~150°. It reads as a broken
+  degree scale; it is arithmetic. The constant described the gearbox we
+  *plan* to fit, not the bare motor actually bolted on. Set to **1.0** (the
+  shaft is the output, so the OUTPUT-REVOLUTIONS convention holds exactly),
+  firmware rebuilt clean. Consequence: `velLimit` 0.25 output rev/s is now
+  90°/s at the shaft instead of ~1350°/s, so motion is correctly much slower.
+- **`enabled` and `connected` are different things, and the UI conflated
+  them.** Joints are built lazily, so J2's spec was enabled from startup while
+  nothing was open on COM3. The card showed a green ON toggle, "no telemetry",
+  dead jog buttons, and `zero: no enabled joints to zero` — about a joint that
+  *was* enabled. Pressing Arm is what builds and connects it. Fixed: an
+  enabled-but-unconnected joint now shows an amber knob and "switched on —
+  press Arm to connect", the readout says `not connected` rather than "no
+  telemetry", and the zero error names the joint and says to arm first.
+- **`Arm.arm()` now returns the build errors it swallows.** `_ensure_built`
+  auto-disables a joint that cannot connect, but the reason only went to
+  `print()` — which under Tauri is a hidden console. J1 would just flip to OFF
+  for no visible reason. The server now logs each as a warning.
+
+**Outcomes / data:**
+- **J2 driven live from the GUI**: connect on COM3 (autodetected), arm, zero,
+  jog. Motion correct and repeatable once the ratio was fixed.
+- `test_arm_server.py` green including the new shutdown case; verified the
+  server process exits on its own (`HasExited: True`), no force-kill needed.
+- `sim_test.py` PASS (worst landing 0.000°, sync 0.000 s); `warmup.txt` clean.
+- `svelte-check` 0 errors / 0 warnings; `cargo build` clean; `pio run` SUCCESS
+  (flash 22.9%).
+- LIVE server startup autodetects the ESP32 correctly: `J2: autodetected COM3`.
+
+**Problems hit:**
+- Repo had moved from `OneDrive\Desktop` to `C:\dev`; `ui/src-tauri/target/`
+  carried absolute paths from the old location and `tauri-build` failed
+  looking for permission files under the dead path. All 76 build-script dirs
+  referenced it, so `cargo clean` (4.5 GB) was the only fix. `.svelte-kit`
+  had the same staleness. Rebuild was 2m10s.
+- Node was on the machine PATH but not in the running shell — VS Code had
+  inherited a pre-install environment snapshot. Restarting VS Code fixes it.
+- A leftover test server holding 8787 made the app show NO SERVER: the child
+  it spawned could not bind and died silently. Same failure as 2026-09-01, so
+  it is now twice. The Rust side does not surface the child's exit at all —
+  worth fixing, since the symptom is indistinguishable from "python missing".
+
+**Still not done — the honest part:**
+- **J1's live path is still unexercised.** J1 was being greased, so the moteus
+  transport built inside the server's event loop has never run under the GUI.
+  It is the piece most likely to bite, because `_build_joint` calls
+  `get_singleton_transport` synchronously — if that hangs rather than raises
+  with no fdcanusb attached, it blocks the event loop and freezes the UI.
+- **J2's `err` is still fabricated** (commanded reported as measured). It read
+  0.00 throughout today's live session, which is exactly when it is most
+  misleading. Unchanged — see the gotcha in CLAUDE.md.
+- Nothing has run *both* joints live, so the coordinated-move path under the
+  GUI is untested.
+- The gearbox burn-in (open question 1) is still not run.
+
+**Next:**
+- Repeat today's bring-up with J1 once it is back: J1 alone first, then both.
+  Confirm the mode switch de-energizes real motors.
+- **Set `GEAR_RATIO` to the true ratio the moment J2's gearbox is fitted**, and
+  re-zero. From tooth counts, not hand rotation.
+- Wire the CL57T ALM output (one wire, ~3 lines of firmware) — the cheapest
+  way to make J2's fault reporting real, and the fabricated-`err` problem is
+  now demonstrably live rather than theoretical.
+**Time:** ~4h   **Who:** —
+
+---
+
 ## 2026-09-01 — Tauri desktop control panel; joints switchable at runtime
 
 **Focus:** a GUI that makes the arm usable without the text console, with

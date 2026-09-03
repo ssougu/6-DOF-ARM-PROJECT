@@ -30,7 +30,18 @@ const int PUL_PIN = 32;
 const int DIR_PIN = 33;
 
 const long  MICROSTEPS_PER_MOTOR_REV = 2000;   // must match SW1-SW4
-const float GEAR_RATIO               = 15.0;   // set to J2's actual ratio
+
+// Output revs per motor rev. The host speaks OUTPUT units, so this must match
+// the hardware actually bolted on RIGHT NOW, not the hardware we plan to fit.
+//
+//   1.0  = bare motor, no gearbox  <-- current state of J2
+//   N    = the fitted reducer's ratio, from TOOTH COUNTS (hand-rotating the
+//          output to measure it gave a false 11.14:1 against a true 15:1)
+//
+// Leaving this at a planned-but-unfitted 15 made every commanded angle come
+// out 15x too big at the shaft, which reads as a broken degree scale.
+// *** Set this to the real ratio when J2's gearbox goes on, and reflash. ***
+const float GEAR_RATIO               = 1.0;
 
 const float STEPS_PER_OUTPUT_REV = MICROSTEPS_PER_MOTOR_REV * GEAR_RATIO;
 

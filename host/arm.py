@@ -269,6 +269,10 @@ class Arm:
         self.estopped = False
         for e in errs:
             print(f"  ! {e} (left disabled)")
+        # Returned so a caller with a UI can say *why* a joint switched itself
+        # off -- under the desktop app stdout goes to a hidden console, and a
+        # joint that silently turns OFF is indistinguishable from a bug.
+        return errs
 
     async def hold(self):
         await asyncio.gather(*(self._joints[i].hold() for i in self.active_ids),
@@ -300,7 +304,13 @@ class Arm:
         ids = [i for i in (list(ids) if ids else list(self.active_ids))
                if self._joints.get(i) is not None]
         if not ids:
-            raise RuntimeError("no enabled joints to zero")
+            # Distinguish "switched off" from "on but never connected" -- the
+            # lazy build means an enabled joint is not open until arm/enable.
+            waiting = [self.specs[i].name for i in self.order
+                       if self.specs[i].enabled and self._joints[i] is None]
+            raise RuntimeError(
+                f"not connected yet ({', '.join(waiting)}) -- arm first"
+                if waiting else "no enabled joints to zero")
         await asyncio.gather(*(self._joints[i].zero() for i in ids),
                              return_exceptions=True)
         for i in ids:
@@ -330,6 +340,11 @@ class Arm:
                 "id": i,
                 "name": ax.name,
                 "kind": spec.kind,
+                # where this joint actually talks, for live bring-up: the
+                # serial port for a stepper, the CAN id for a moteus.
+                "link": (spec.port if spec.kind == "stepper"
+                         else f"id {spec.moteus_id}" if spec.kind == "moteus"
+                         else ""),
                 "enabled": spec.enabled,
                 "connected": self._joints[i] is not None,
                 "deg": None if s is None else _num(s.degrees, 3),

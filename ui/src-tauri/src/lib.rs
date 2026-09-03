@@ -5,6 +5,7 @@
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use tauri::{Manager, State};
 
@@ -76,9 +77,24 @@ fn spawn_server(sim: bool) -> Result<Child, String> {
         .map_err(|e| format!("could not start python: {e}. Is Python on PATH?"))
 }
 
-fn kill(state: &Server) {
+/// Stop the server, preferring the exit it does to itself.
+///
+/// The UI sends `shutdown` over the WebSocket first, which de-energizes every
+/// joint and drops the COM ports. We give that a moment to land before
+/// resorting to `kill()` -- a hard kill is TerminateProcess on Windows, which
+/// skips the server's cleanup entirely. Waiting also means the old process has
+/// released port 8787 before the replacement tries to bind it.
+fn kill(state: &Server, grace: Duration) {
     if let Ok(mut guard) = state.child.lock() {
         if let Some(mut c) = guard.take() {
+            let deadline = Instant::now() + grace;
+            while Instant::now() < deadline {
+                match c.try_wait() {
+                    Ok(Some(_)) => return, // exited on its own; nothing to kill
+                    Ok(None) => std::thread::sleep(Duration::from_millis(40)),
+                    Err(_) => break,
+                }
+            }
             let _ = c.kill();
             let _ = c.wait();
         }
@@ -100,10 +116,17 @@ fn server_status(state: State<Server>) -> Status {
     }
 }
 
+/// Relaunch the control server, optionally flipping SIM/LIVE.
+///
+/// `async` so the grace period in `kill` runs off the UI thread -- a sync
+/// command would freeze the webview for as long as it waits.
 #[tauri::command]
-fn restart_server(state: State<Server>, sim: Option<bool>) -> Result<Status, String> {
-    kill(&state);
-    let want = sim.unwrap_or(*state.sim.lock().unwrap());
+async fn restart_server(
+    state: State<'_, Server>,
+    sim: Option<bool>,
+) -> Result<Status, String> {
+    let want = { sim.unwrap_or(*state.sim.lock().unwrap()) };
+    kill(&state, Duration::from_millis(2000));
     let child = spawn_server(want)?;
     *state.child.lock().unwrap() = Some(child);
     *state.sim.lock().unwrap() = want;
@@ -135,14 +158,17 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
-                kill(&window.state::<Server>());
+                // Short grace: the page sends `shutdown` as it unloads, so the
+                // server usually de-energizes itself before we get here. Not
+                // long enough to make closing the window feel stuck.
+                kill(&window.state::<Server>(), Duration::from_millis(800));
             }
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
             if let tauri::RunEvent::ExitRequested { .. } = event {
-                kill(&app.state::<Server>());
+                kill(&app.state::<Server>(), Duration::from_millis(800));
             }
         });
 }

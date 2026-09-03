@@ -26,11 +26,19 @@
   <header>
     <div class="title">
       <h2>{j.name}</h2>
-      <span class="kind">{j.kind}</span>
+      <div class="sub">
+        <span class="kind">{j.kind}</span>
+        {#if j.link && !(arm.state?.sim ?? true)}
+          <span class="link" title="where this joint is addressed">{j.link}</span>
+        {/if}
+      </div>
     </div>
     <button class="toggle" class:on={j.enabled}
+            class:pending={j.enabled && !j.connected}
             onclick={() => (j.enabled ? arm.disable(j.id) : arm.enable(j.id))}
-            title={j.enabled ? 'Switch this joint off (de-energize)' : 'Switch on'}>
+            title={!j.enabled ? 'Switch on'
+                   : !j.connected ? 'Switched on but not connected yet'
+                   : 'Switch this joint off (de-energize)'}>
       <span class="knob"></span>
       <span class="lbl">{j.enabled ? 'ON' : 'OFF'}</span>
     </button>
@@ -41,6 +49,8 @@
   <div class="readout">
     {#if !j.enabled}
       <span class="big muted">--</span><span class="unit">disabled</span>
+    {:else if !j.connected}
+      <span class="big muted">--</span><span class="unit">not connected</span>
     {:else if j.deg === null}
       <span class="big muted">--</span><span class="unit">no telemetry</span>
     {:else}
@@ -49,7 +59,13 @@
   </div>
 
   <div class="chips">
-    {#if j.enabled && j.deg !== null}
+    {#if !j.enabled}
+      <span class="chip">de-energized</span>
+    {:else if !j.connected}
+      <!-- Switched on, but the port is not open yet: joints are built lazily,
+           so nothing is connected until Arm (or a fresh off/on). -->
+      <span class="chip warn">switched on &mdash; press Arm to connect</span>
+    {:else if j.deg !== null}
       <span class="chip" class:live={j.moving}>
         {j.moving ? 'moving' : 'idle'}
       </span>
@@ -57,8 +73,6 @@
       {#if j.fault > 0}<span class="chip bad">fault {j.fault}</span>{/if}
       {#if j.voltage !== null}<span class="chip">{j.voltage.toFixed(1)} V</span>{/if}
       {#if j.temp !== null}<span class="chip">{j.temp.toFixed(0)} C</span>{/if}
-    {:else if !j.enabled}
-      <span class="chip">de-energized</span>
     {/if}
   </div>
 
@@ -93,8 +107,12 @@
   header { display: flex; justify-content: space-between; align-items: flex-start; }
   .title { display: flex; flex-direction: column; gap: 2px; }
   h2 { margin: 0; font-size: 14px; font-weight: 650; letter-spacing: .02em; }
+  .sub { display: flex; align-items: center; gap: 6px; }
   .kind { font-size: 10px; color: var(--muted); text-transform: uppercase;
           letter-spacing: .08em; }
+  .link { font-family: ui-monospace, Consolas, monospace; font-size: 10px;
+          color: var(--muted); background: var(--bg2); padding: 1px 6px;
+          border-radius: 4px; }
 
   .toggle {
     display: flex; align-items: center; gap: 7px; cursor: pointer;
@@ -108,6 +126,10 @@
   }
   .toggle.on { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
   .toggle.on .knob { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  /* on, but the port is not open yet -- green here would claim readiness */
+  .toggle.pending { color: var(--warn);
+                    border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
+  .toggle.pending .knob { background: var(--warn); box-shadow: none; }
 
   .readout { text-align: center; display: flex; align-items: baseline;
              justify-content: center; gap: 6px; }
@@ -121,6 +143,8 @@
   .chip { font-size: 10px; padding: 2px 7px; border-radius: 999px;
           background: var(--bg2); color: var(--muted); border: 1px solid var(--line); }
   .chip.live { color: var(--accent); border-color: var(--accent); }
+  .chip.warn { color: var(--warn);
+               border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
   .chip.bad { color: #ff6b6b; border-color: #b3151b; }
 
   .jog { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }

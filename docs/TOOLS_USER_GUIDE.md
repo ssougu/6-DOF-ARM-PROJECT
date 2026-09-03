@@ -239,13 +239,49 @@ npm run tauri build                  # packaged .exe + installer
 
 The Rust shell only spawns and kills `host/arm_server.py` — all arm logic
 stays in Python. Closing the window kills the server, so it can never be left
-holding COM ports. **Defaults to SIM**; set `ARM_UI_SIM=0` for hardware.
+holding COM ports. **Defaults to SIM**; `ARM_UI_SIM=0` starts in LIVE, or use
+the SIM/LIVE button in the header to switch at runtime.
+
+Switching modes restarts the server. The UI sends a `shutdown` command first,
+which de-energizes every joint and releases the COM ports; only if that does
+not land within 2 s does the Rust side force-kill. Same on window close, which
+is why the app takes a beat to exit. Going LIVE needs a second, explicit
+confirmation — the SIM default exists so no single stray click can energize a
+motor, and a one-click toggle would give that back.
+
+In LIVE, each joint card shows where it is addressed (`COM3` for the stepper,
+`id 1` for the moteus) so a joint that will not come up is easy to diagnose.
+
+### Live bring-up, in order
+
+Switching to LIVE restarts the server, which rebuilds every spec from
+defaults — so **a joint you switched off comes back on after a mode switch**.
+Do it in this order:
+
+1. **SIM → LIVE** (confirm the prompt)
+2. **Switch off any joint that is not physically present.** Do not switch a
+   missing moteus *on*: `_build_joint` calls `get_singleton_transport`
+   synchronously, and with no fdcanusb attached that can block the event loop
+   and freeze the UI. Pressing Arm with it enabled is safe — the failure is
+   caught, the joint is auto-disabled, and the reason is logged.
+3. **Arm.** This is what actually opens the ports. Until you arm, an enabled
+   joint shows an amber knob and *"switched on — press Arm to connect"*, its
+   controls are dead, and `Zero here` refuses — it is enabled but not
+   connected. See the gotcha in CLAUDE.md.
+4. Place the arm at home **by hand**, then **Zero here**. J2 has no absolute
+   reference; its zero is wherever it powered up, and it moves again after
+   every ESP32 reset (including a reflash).
+5. Jog. Start at ±1°.
+
+If a joint switches itself OFF during Arm, the log pane says why — that is a
+connection failure, not a bug.
 
 What's on screen:
 
 | | |
 |---|---|
 | **E-STOP** | top-right, always visible. Also bound to **Esc**. Latches; press *Re-arm* to clear. Red border round the whole window while latched. |
+| **SIM / LIVE badge** | it is a **button**. Click it to switch modes without relaunching — SIM→LIVE asks for confirmation first, LIVE→SIM goes straight through. Greyed out mid-route, and in a browser (no Rust side to restart). |
 | **Arm / Disarm / Home** | plus a speed slider (0.05–1.0) and *Zero here* behind a confirm |
 | **Joint card** (one per joint) | ON/OFF toggle, dial with soft-limit sweep, live angle, moving/velocity/fault/volts/temp chips, jog buttons (±1/5/10°), go-to-angle box |
 | **Routines** | pick any `routines/*.txt`, Run / Stop, live step counter and progress bar |

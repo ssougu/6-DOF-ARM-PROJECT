@@ -2,6 +2,7 @@
 
 export type Joint = {
   id: number; name: string; kind: string;
+  link: string;                 // COM port (stepper) or CAN id (moteus)
   enabled: boolean; connected: boolean;
   deg: number | null; vel_dps: number | null;
   moving: boolean; fault: number;
@@ -106,6 +107,21 @@ class ArmLink {
   zero(ids: number[] | null) { this.send({ cmd: 'zero', ids, confirm: true }); }
   runRoute(name: string) { this.send({ cmd: 'run_route', name }); }
   stopRoute() { this.send({ cmd: 'stop_route' }); }
+
+  /** Ask the server to de-energize and exit. Used before a mode switch. */
+  shutdown() { this.send({ cmd: 'shutdown' }); }
+
+  /** Resolves once the socket is actually down, or after `ms`. */
+  waitForClose(ms = 3000) {
+    return new Promise<boolean>((resolve) => {
+      if (!this.connected) return resolve(true);
+      const t0 = Date.now();
+      const tick = setInterval(() => {
+        if (!this.connected) { clearInterval(tick); resolve(true); }
+        else if (Date.now() - t0 > ms) { clearInterval(tick); resolve(false); }
+      }, 50);
+    });
+  }
 }
 
 export const arm = new ArmLink();

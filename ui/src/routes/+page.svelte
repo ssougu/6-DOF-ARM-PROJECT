@@ -3,6 +3,7 @@
   import { arm } from '$lib/arm.svelte';
   import EStop from '$lib/components/EStop.svelte';
   import ArmBar from '$lib/components/ArmBar.svelte';
+  import ModeSwitch from '$lib/components/ModeSwitch.svelte';
   import JointCard from '$lib/components/JointCard.svelte';
   import RoutinePanel from '$lib/components/RoutinePanel.svelte';
   import LogPane from '$lib/components/LogPane.svelte';
@@ -12,8 +13,15 @@
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.preventDefault(); arm.estop(); }
     };
+    // Closing the window should de-energize through the server rather than
+    // leaving it to the hard kill; Rust waits ~800 ms for this to land.
+    const onBye = () => arm.shutdown();
+    window.addEventListener('beforeunload', onBye);
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('beforeunload', onBye);
+    };
   });
 
   let s = $derived(arm.state);
@@ -28,9 +36,7 @@
       <span class="badge" class:on={arm.connected}>
         {arm.connected ? 'connected' : 'no server'}
       </span>
-      {#if s}
-        <span class="badge mode" class:sim={s.sim}>{s.sim ? 'SIM' : 'LIVE'}</span>
-      {/if}
+      {#if s}<ModeSwitch />{/if}
       {#if s?.armed}<span class="badge armed">armed</span>{/if}
       {#if s?.busy}<span class="badge busy">{s.busy}</span>{/if}
     </div>
@@ -76,8 +82,6 @@
            border: 1px solid var(--line); color: var(--muted);
            letter-spacing: .07em; text-transform: uppercase; }
   .badge.on { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
-  .badge.mode { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
-  .badge.mode.sim { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
   .badge.armed { color: var(--ok); border-color: var(--ok); }
   .badge.busy { color: var(--accent); border-color: var(--accent); }
 
