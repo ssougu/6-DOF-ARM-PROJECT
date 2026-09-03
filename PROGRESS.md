@@ -123,6 +123,67 @@ its live path is still unexercised.
 
 ---
 
+## 2026-09-02 (evening) — perception stack stood up; runs without the arm
+
+**Focus:** J2 is blocked on mechanical, so start the half of the demo that
+needs no arm at all. Perception was 100% unstarted with ~9 weeks to the fair,
+and it is the workstream least coupled to anything else.
+
+**Done:**
+- **`vision/` created.** `board.py` (ChArUco, defined once, printable at exact
+  scale), `camera.py` (capture + focus/exposure pinning), `calibrate.py`
+  (intrinsics + coverage score), `detect.py` (YOLO11m on CUDA),
+  `locate.py` (**pixel → table mm by ray-plane**), `check_vision.py`
+  (8 checks, PASS/FAIL, no camera needed).
+- **Nothing needed installing.** torch 2.6.0+cu124, ultralytics 8.4.61,
+  opencv 4.13 were all already present and CUDA works. Only the 38.8 MB
+  YOLO11m weights were downloaded (gitignored).
+- **Ray-plane is verified synthetically** — a virtual camera projects points
+  with known board coordinates, and `pixel_to_table` recovers them to 4.8e-14
+  mm. That test caught a real sign error in `--plane-offset`: the offset moved
+  the plane toward the camera when the documented meaning is *behind* the
+  board face. A visual overlay would have looked completely fine.
+
+**Outcomes / data:**
+- YOLO11m, RTX 4060 Laptop, imgsz 640: **median 8.8 ms (114 fps)**, p95
+  10.4 ms, worst 44.2 ms. Far faster than look-then-move needs — detection
+  will not be the bottleneck, localisation accuracy will.
+- **FP16 is not worth it**: median 8.4 ms but p95 17.1 ms and worst 64 ms.
+  Bound by preprocessing and NMS, not conv math. Stay FP32.
+- `check_vision.py`: 8/8.
+
+**Corrections to earlier assumptions:**
+- **The laptop GPU is an RTX 4060 Laptop with 8 GB, not a 4090.** CLAUDE.md
+  had said 4090 since the start. Fine for YOLO11m, but it changes the headroom
+  story if anything heavier is ever considered.
+
+**Problems hit:**
+- `cv2.setLogLevel` does not exist in this OpenCV build, and my first attempt
+  to quiet the camera-probe warnings wrapped it in try/except — so it silently
+  did nothing while looking like it worked. Exactly the failure mode this repo
+  keeps warning about, committed in new code. Now an fd-level stderr redirect,
+  scoped to the scan, with the restore verified.
+
+**Not done — and it matters:**
+- **No part of this has seen a real camera.** The maths is proven; the capture
+  path, focus locking against an actual driver, and calibration quality are
+  all untested. Deliberately not run: turning on the webcam unattended is not
+  mine to do.
+- No board printed yet, so no intrinsics, so no real mm number.
+
+**Next:**
+- Print `charuco_7x5_25mm.png` at **exactly 100%**, verify a square with
+  calipers, glue it to something rigid.
+- `python camera.py --index 0 --lock` — if the laptop webcam will not pin
+  focus, it cannot be calibrated and the RealSense is the answer.
+- Calibrate, then `locate.py --ruler` against a real ruler. **That mm number
+  is the deliverable** — it feeds the error budget and tells us early whether
+  the grasp closes, while there is still time to widen the jaws instead of
+  chasing joint precision.
+**Time:** ~1h   **Who:** —
+
+---
+
 ## 2026-09-01 — Tauri desktop control panel; joints switchable at runtime
 
 **Focus:** a GUI that makes the arm usable without the text console, with

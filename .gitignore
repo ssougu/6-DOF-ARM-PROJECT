@@ -9,3 +9,11 @@ ui/build/
 ui/.svelte-kit/
 ui/src-tauri/target/
 ui/src-tauri/gen/
+
+# vision
+# Model weights are ~39 MB and re-downloadable; check_vision.py prints the
+# exact command if they are missing. The ChArUco PNG and intrinsics_*.json
+# ARE committed on purpose -- the PNG is the board we physically printed, and
+# the intrinsics are measured data, like host/profile_1.json.
+vision/models/*.pt
+vision/shots/

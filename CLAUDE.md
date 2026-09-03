@@ -48,6 +48,15 @@ pick it up. Reliably, repeatedly, on request.
     ├── routines/               route files: warmup, demo, pick_place, workout
     ├── profile_1.json          tuned J1 config — COMMIT THIS
     └── logs/                   every test writes itself here
+├── vision/                     perception — runs without the arm
+│   ├── check_vision.py         self-check, no camera needed: CUDA, weights,
+│   │                           and ray-plane recovering known mm
+│   ├── board.py                the ChArUco board, defined once + printable
+│   ├── camera.py               capture; pins focus/exposure and verifies it
+│   ├── calibrate.py            intrinsics + coverage score → intrinsics_*.json
+│   ├── detect.py               YOLO11m on CUDA → boxes + ground point
+│   ├── locate.py               pixel → table mm by ray-plane; --ruler tests it
+│   └── models/                 yolo11m.pt (GITIGNORED, re-downloadable)
 ui/                             Tauri v2 + SvelteKit desktop control panel
 ├── src/                        Svelte 5 frontend (joint cards, jog, routines)
 │   ├── lib/arm.svelte.ts       WebSocket link + command helpers
@@ -65,8 +74,9 @@ ui/                             Tauri v2 + SvelteKit desktop control panel
 | J4 | **stepper** (ships with its CL57T) | CL57T | step/dir | decided 2026-09-01, not ordered |
 | J5, J6 | **FEETECH STS3215** bus servos | — | half-duplex TTL | decided 2026-09-01, unwired |
 
-Also on hand: RealSense (eye-in-hand planned), RTX 4090 **Windows** laptop for
-vision. **Every joint has feedback at the actuator level** — moteus (rotor
+Also on hand: RealSense (eye-in-hand planned) and the **RTX 4060 Laptop (8 GB)
+Windows** laptop for vision — measured 2026-09-02; earlier notes here said
+4090, which was wrong. **Every joint has feedback at the actuator level** — moteus (rotor
 encoder), CL57T (motor's 1000-line encoder, closed loop), STS3215 (12-bit
 output encoder). Nothing in this arm is truly open-loop, which is why a
 non-real-time host is survivable.
@@ -241,6 +251,17 @@ $env:ARM_UI_SIM=0; npm run tauri dev              # LIVE hardware
 python host/arm_server.py --sim                   # ws://127.0.0.1:8787
 python host/test_arm_server.py                    # protocol test suite
 
+# vision (needs no arm, no camera for the self-check)
+cd vision
+python check_vision.py                            # 8 checks, PASS/FAIL
+python board.py                                   # printable ChArUco board
+python camera.py --list                           # what cameras exist
+python camera.py --index 0 --lock                 # can this camera hold still?
+python calibrate.py --index 0 --lock --tag webcam # intrinsics
+python locate.py --ruler                          # pixel -> mm, vs a real ruler
+python locate.py --detect                         # YOLO objects located in mm
+python detect.py --bench                          # inference latency
+
 # firmware  (pio is not on PATH; it's at ~/.platformio/penv/Scripts/pio.exe)
 cd firmware/j2_stepper
 pio run -t upload                                 # port pinned to COM3 in platformio.ini
@@ -297,11 +318,22 @@ first line — type motion commands one at a time.
    closes its own loop and the host is only a trajectory sequencer, but the
    jitter has never actually been measured. Instrument the control loop and run
    `workout.txt` idle vs under CUDA load before designing around it.
-7. **Nothing in the perception or grasping half of the demo exists yet** — no
-   gripper, camera mount, calibration, hand-eye transform, detection or IK. See
-   `docs/VISION_APPROACH.md`. IK is additionally blocked on measured link
-   lengths, which are blocked on the arm being built: a serial dependency that
-   will bite late if mechanical slips.
+7. **Perception is started; grasping is not.** As of 2026-09-02 `vision/` has
+   the detector (YOLO11m/CUDA, 8.8 ms), the board, camera focus-locking,
+   intrinsic calibration and ray-plane localisation, all self-checked. **None
+   of it has yet seen a real camera** — the maths is verified synthetically
+   and the capture path is untested. The next step is a printed board and a
+   ruler: measured mm error at working distance is the number the arm design
+   needs, and nothing upstream substitutes for it.
+   Still missing entirely: **camera mount, hand-eye transform, IK, and a
+   gripper**. IK is blocked on measured link lengths, which are blocked on the
+   arm being built — a serial dependency that will bite late if mechanical
+   slips.
+8. ⚠️ **The gripper has no owner and is not in the actuator map.** The demo is
+   "pick it up", and J1–J6 accounts for no gripper actuator at all. It is on
+   the critical path with a mechanical design dependency of its own. An STS3215
+   is the obvious pick given J5/J6 already use that bus. Raised 2026-09-02;
+   unassigned.
 
 ## Scope discipline
 
