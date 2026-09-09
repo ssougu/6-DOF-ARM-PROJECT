@@ -8,8 +8,9 @@ Add an entry there at the end of each working session.
 
 Design decisions live in `docs/`: **`CONTROLLER_ARCHITECTURE.md`** (where
 control runs, the Teensy 4.1 decision, phasing) and **`VISION_APPROACH.md`**
-(camera mount, calibration, error budget). Read those before proposing changes
-to the control or perception layers.
+(camera mount, calibration, error budget). **`POWER_DISTRIBUTION.md`** holds
+the 36 V rail decision, load bounds and protection. Read those before proposing
+changes to the control, power or perception layers.
 
 ## What this is
 
@@ -29,6 +30,7 @@ pick it up. Reliably, repeatedly, on request.
 │   ├── TOOLS_USER_GUIDE.md     every host script, commands, workflows
 │   ├── CONTROLLER_ARCHITECTURE.md  where control runs; the Teensy 4.1 decision
 │   ├── VISION_APPROACH.md      camera mount, calibration, error budget
+│   ├── POWER_DISTRIBUTION.md   rails, load bounds, protection, grounding
 │   ├── J2_DESIGN_BRIEF.md      hand-off to the ME: encoder provision, stiffness
 │   └── J1_BRINGUP_REPORT.md    (to be written — J1 method + raw data, 2026-08-26)
 ├── firmware/
