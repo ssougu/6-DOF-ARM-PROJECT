@@ -190,17 +190,26 @@ and the entire software path already exists.
 |---|---|---|---|
 | 100 nF ceramic capacitors | 20 | $3 | One at every IC's supply pin. Not optional |
 | 10 µF / 100 µF electrolytic | 5 | $3 | Bulk on each rail |
-| **74HCT244** or **74HCT245** | 2 | $2 | 3.3 V → 5 V buffer for step/dir, if needed |
-| 74HC125 / 74HC126 | 2 | $2 | Half-duplex direction control, if the servo bus ever moves off the USB adapter |
+| **74ACT244** (SOIC-20W) | 2 | $2 | Step/dir buffer — **ACT, not HCT** |
+| SN74LVC1G126 + SN74LVC1G125 | 2 ea | $3 | STS3215 half-duplex, both run at 3.3 V |
+| 74HC123 or 74LVC1G123 | 2 | $2 | Retriggerable monostable — step/dir runaway watchdog |
 
-On the buffer: the architecture doc is right that the CL57T's opto inputs are
-current-driven and the existing common-anode pattern carries over from the
-ESP32 — it is already proven on J2. Worth knowing the marginal case, though:
-with PUL+ at 5 V and the MCU pin idling at 3.3 V, the opto still sees ~1.7 V,
-which is above its LED forward voltage. It evidently stays below the turn-on
-threshold in practice, but if you ever chase phantom steps, that is the first
-thing to suspect, and a 74HCT244 driving PUL+ with PUL− grounded gives a clean
-full-swing 0–5 V drive instead.
+⚠️ **74HCT244 is not sufficient and an earlier revision of this list was wrong
+to suggest it.** The CL57T needs **7 mA minimum** into its opto inputs; HCT
+guarantees only ~±6 mA, which lands under the threshold. Its own troubleshooting
+table lists "control signal too weak" against exactly that window as a cause of
+erratic motion. **74ACT244** gives ±24 mA with TTL input thresholds, so 3.3 V
+reads reliably high. One octal part covers both axes — two independent 4-bit
+banks with separate OE, J2 in one and J4 in the other.
+
+Those OE pins are also the runaway watchdog: gate them with the monostable that
+firmware must kick every ~100 ms. See `POWER_ARCHITECTURE.md` §5. A hung MCU
+leaves FlexPWM emitting pulses forever otherwise — moteus is immune via its
+0.25 s timeout, the CL57T has no equivalent.
+
+⚠️ **Set the CL57T S3 selector to 5 V before wiring anything.** Factory setting
+is 24 V, and the manual states that driving 5 V signals with S3 at 24 V damages
+the input photocoupler. Label both drives physically.
 
 ### Safety chain
 
@@ -280,7 +289,7 @@ PJRC, and none of it is blocked on a mechanical decision. One basket:
 | Large breadboard + jumper kit + Dupont set | ~$27 |
 | E12 resistor assortment + 120 Ω separately | ~$12 |
 | 100 nF / electrolytic capacitor assortment | ~$6 |
-| 74HCT244 ×2, 74HC125 ×2 | ~$4 |
+| 74ACT244 ×2, LVC1G125/126, 74HC123 ×2 | ~$7 |
 | 8-channel USB logic analyzer | ~$12 |
 | E-stop button + limit switches + relay | ~$30 |
 | **Total** | **~$140** |

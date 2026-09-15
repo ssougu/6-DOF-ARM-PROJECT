@@ -123,6 +123,69 @@ its live path is still unexercised.
 
 ---
 
+## 2026-09-14 — power architecture settled from datasheets; regen is the hazard
+
+**Focus:** turn the power system from estimates into a sourced design.
+
+**Done:**
+- **`docs/POWER_ARCHITECTURE.md`** — 36 V bus, rail tree, regen handling, the
+  combined PDB + Teensy board, stackup, pin map, power budget, bring-up
+  checklist. Every device figure now comes from a named datasheet, listed in
+  the Sources section.
+- **`docs/POWER_DISTRIBUTION.md` deleted.** It was written 2026-09-08 from
+  estimates and is superseded on every point it covered. Two power documents
+  that disagree is the failure this repo keeps warning about. Its harness
+  content (wire gauge, star grounding, shield termination) was folded into
+  §9 of the new doc; nothing else survived contact with the real numbers.
+
+**What the datasheets changed:**
+- **Regeneration is the primary hazard and was missing entirely** from the
+  earlier analysis. A gravity-loaded arm back-drives, a mains supply cannot
+  sink it, and 36 V against the moteus 44 V ceiling leaves **8 V of headroom**.
+  Handled by `servo.max_regen_power_W` near zero plus accel limits — no brake
+  chopper. **A TVS cannot help**: nothing fits inside a 36–44 V window, because
+  the standoff-to-clamp ratio of the technology is wider than the headroom.
+- **Cross-coupling:** moteus regen shares a bus with the CL57Ts, so a hard
+  reversal on J1 or J3 can fault a stepper driver that did nothing wrong. The
+  symptom is J2 dropping out mid-move, which is near-undiagnosable from outside.
+- **74HCT244 is not sufficient for the CL57T** and the parts list said to buy
+  it. The drive needs **7 mA minimum** into its optos; HCT guarantees ~±6 mA.
+  Corrected to **74ACT244** (±24 mA, TTL thresholds). One octal part covers both
+  axes, and its split OE banks double as the runaway watchdog.
+- **Step/dir runaway has no equivalent of the moteus watchdog.** If firmware
+  hangs, FlexPWM keeps emitting pulses forever. Fixed with a retriggerable
+  monostable gating the buffer OE.
+- **CL57T power inputs must not be daisy-chained** — separate home-runs per the
+  manual. The opposite of moteus, which is designed to chain.
+- **STS3215 ground offset:** signal low is 0–0.45 V, and two stalled servos on
+  daisy-chained 24 AWG produce a 0.45 V offset — the entire budget. **J6 is the
+  gripper; it stalls every time it closes**, so this is normal operation, not a
+  corner case. Fixed with 20 AWG and star wiring.
+- **CL57T S3 selector destroys the input photocoupler if wrong** (factory is
+  24 V, ours must be 5 V). Now first item on the bring-up checklist.
+- **Supply sizing corrected downward.** Earlier advice was "buy bigger for
+  margin". Wrong here: the supply cannot sink regen either way, so extra
+  capacity buys nothing, and larger units have more output capacitance and
+  worse inrush. Target **36 V, ~500 W, ~14 A**; do not exceed ~600 W.
+
+**Conflict to resolve:**
+- ⚠️ **CLAUDE.md's gotcha lists TJA1051 as classic-CAN only.** The new doc
+  names TJA1051T/3 as mjbots' own recommendation, and NXP specify it to
+  5 Mbit/s. One of the two is wrong and it decides a purchase. **Verify against
+  the NXP datasheet before ordering.** SN65HVD230 being classic-only is not in
+  dispute.
+
+**Next:**
+- **Cheapest next measurement:** run `workout.txt` on J1 at 24 V with tview
+  watching bus voltage and fault codes. It is already the regen worst case, and
+  whatever margin appears at 24 V predicts 36 V. That single number validates
+  the figure the entire rail design hangs on.
+- Gearbox continuous output torque from the ME — sets current limits on every
+  branch, and is now the largest missing input to the electrical design.
+**Time:** —   **Who:** —
+
+---
+
 ## 2026-09-03 — vision verified on the real camera; detection characterisable
               without a board
 
