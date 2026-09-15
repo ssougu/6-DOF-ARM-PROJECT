@@ -9,3 +9,32 @@
 *.step binary
 *.f3d  binary
 *.pdf  binary
+
+# ---------------------------------------------------------------------------
+# Altium (LFS). SchDoc/PcbDoc are binary compound files rewritten whole on
+# every save, so plain git stores a full copy per commit and the repo grows
+# fast. Tracked from the start because migrating later means rewriting history.
+# ---------------------------------------------------------------------------
+*.SchDoc   filter=lfs diff=lfs merge=lfs -text
+*.PcbDoc   filter=lfs diff=lfs merge=lfs -text
+*.SchLib   filter=lfs diff=lfs merge=lfs -text
+*.PcbLib   filter=lfs diff=lfs merge=lfs -text
+*.IntLib   filter=lfs diff=lfs merge=lfs -text
+*.PcbFab   filter=lfs diff=lfs merge=lfs -text
+*.CmpLib   filter=lfs diff=lfs merge=lfs -text
+*.Harness  filter=lfs diff=lfs merge=lfs -text
+
+# Fab/assembly packages kept as releases
+*.zip      filter=lfs diff=lfs merge=lfs -text
+
+# Mechanical CAD - big, binary, and coming later
+*.step     filter=lfs diff=lfs merge=lfs -text
+*.stp      filter=lfs diff=lfs merge=lfs -text
+*.stl      filter=lfs diff=lfs merge=lfs -text
+*.f3d      filter=lfs diff=lfs merge=lfs -text
+*.3mf      filter=lfs diff=lfs merge=lfs -text
+
+# Altium project/output text files - keep diffable
+*.PrjPcb   text
+*.OutJob   text
+*.Annotation text

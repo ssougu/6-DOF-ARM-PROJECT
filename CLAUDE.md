@@ -33,6 +33,9 @@ pick it up. Reliably, repeatedly, on request.
 │   ├── POWER_ARCHITECTURE.md   36 V bus, regen, rail tree, PDB+Teensy board
 │   ├── J2_DESIGN_BRIEF.md      hand-off to the ME: encoder provision, stiffness
 │   └── J1_BRINGUP_REPORT.md    (to be written — J1 method + raw data, 2026-08-26)
+├── hardware/                   Altium (LFS) + later mechanical CAD
+│   ├── arm-pdb/                the PDB + Teensy board
+│   └── releases/               fab packages actually sent out
 ├── firmware/
 │   ├── j2_stepper/             PlatformIO, ESP32, Arduino framework C++
 │   │   ├── platformio.ini      upload_port/monitor_port pinned to COM3

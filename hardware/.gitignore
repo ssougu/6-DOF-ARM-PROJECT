@@ -1,0 +1,34 @@
+# Altium generated / local-only artifacts.
+#
+# Everything here is either regenerable, machine-specific, or grows without
+# bound. If Altium starts producing something not listed, add it — the list is
+# not exhaustive and only gets accurate by running the tool.
+
+# Altium's own local history. Keeps a copy of every save and reaches
+# gigabytes on an active project. Git is the history; this is not.
+History/
+__Previews/
+
+# Generated at build/output time
+Project Outputs for */
+Project Logs for */
+Project Group Outputs for */
+*.PrjPcbStructure
+*.SchDocPreview
+*.PcbDocPreview
+*.SchLibPreview
+*.PcbLibPreview
+
+# Temp, autosave, backups
+*.$$$
+*.~*
+*.bak
+.AutoSave*
+*.Nav
+
+# Per-user workspace state, not design intent
+*.DsnWrk
+*.PrjPcbVariants
+
+# Working output directory (see README — fab packages go in releases/ instead)
+*/outputs/
