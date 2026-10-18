@@ -32,7 +32,13 @@ pick it up. Reliably, repeatedly, on request.
 │   ├── VISION_APPROACH.md      camera mount, calibration, error budget
 │   ├── POWER_ARCHITECTURE.md   36 V bus, regen, rail tree, PDB+Teensy board
 │   ├── J2_DESIGN_BRIEF.md      hand-off to the ME: encoder provision, stiffness
-│   └── J1_BRINGUP_REPORT.md    (to be written — J1 method + raw data, 2026-08-26)
+│   ├── J1_CHARACTERIZATION_PLAN.md  the full J1 test plan, with derivations
+│   └── J1_SESSION_REPORT_2026-10-18.md  first bench results + corrections
+├── analysis/                   offline plotting; never touches hardware
+│   ├── j1_figures.m            MATLAB: all 8 figures (UNTESTED — no MATLAB here)
+│   ├── j1_figures.py           Python mirror, same logic/palette — this made the PNGs
+│   ├── j1_style.m  j1_manifest.m  j1_load_run.m  j1_settle.m  j1_travel_time.m
+│   └── figs/                   rendered PNGs, committed
 ├── hardware/                   Altium (LFS) + later mechanical CAD
 │   ├── arm-pdb/                the PDB + Teensy board
 │   └── releases/               fab packages actually sent out
@@ -166,24 +172,38 @@ designed.
 
 ## Numbers that matter
 
-From the 2026-08-26 J1 session (see the report for method):
+**Superseded 2026-10-18 by an n=50 run.** See
+`docs/J1_SESSION_REPORT_2026-10-18.md`; figures in `analysis/figs/`.
 
-| Metric | Value |
-|---|---|
-| Repeatability, fixed two-point | 0.02–0.04° |
-| **Repeatability, random approach** | **0.36°** ← design around this one |
-| Worst single move | 0.42° |
-| Backlash (direction split, with integrator) | 0.23° |
-| Step response | 1.6% overshoot, 0.17 s settle |
+| Metric | Value | Basis |
+|---|---|---|
+| **Design figure, \|μ\|+2σ** | **0.685° → 4.78 mm at 400 mm** | n=50, random approach |
+| Landing-error σ | 0.2950° (95% CI ±20%) | n=50 |
+| Mean \|error\| | 0.2656° | n=50 |
+| Worst single move | 0.5712° | n=50 |
+| Direction split | 0.0231° ± 0.0835 (SE) | indistinguishable from zero |
+| Backlash, two-point | 0.23° (0.75° at 0.5 rev/s, n=2) | rotor-side inference only |
+| Static error floor | 0.03–0.31° | 5 step sizes |
+| Damping | **overdamped, ζ ≥ 1** | no overshoot at any step size |
 
-The two-point number flatters the joint by 12×. Quote 0.36°. At 400 mm reach
-that is ±2.5 mm from J1 alone, before the other five joints contribute — open-
-loop forward kinematics will not be enough for a grasp.
+**The old 0.36° was never a σ — it was the *range* of 20 samples.** Ranges grow
+with n, so it was not comparable to anything. Quote **0.685°**; it is 1.9× worse
+than the figure previously designed around.
 
-2026-08-31, J1 in the `workout` routine (±75° moves, speed 0.3–1.0, J2 now
-hanging off it): mean |error| 0.14°, worst 0.48°, and a 6-point
-return-to-pose spread of **0.84°** — roughly 2× the cold bench number under
-bigger/faster moves. Not yet characterised properly; see PROGRESS.md.
+Likewise the 2026-08-31 `workout` figure of 0.84° was a range of **6**.
+Normalised with `σ̂ = R/d₂` the bench-to-coordinated degradation is **3.4×**, not
+the ~2× once recorded — but at n=6 the CI is ±62%, so it never supported a
+comparison at all. **No figure from n < 22 belongs in this file.**
+
+The previously recorded step response, *"1.6% overshoot, 0.17 s settle"*, **does
+not reproduce and should not be quoted.** It had no logged provenance, and
+measurement shows negative overshoot on four of five steps with settling of
+0.72–1.22 s. See the trajectory-generator gotcha below for why.
+
+At 400 mm, 0.685° is ±4.78 mm from J1 alone — open-loop forward kinematics will
+not be enough for a grasp. Note this is **repeatability, not accuracy**: the
+joint returns to a pose reliably, it just cannot tell you where that pose is in
+millimetres, because the only encoder sits upstream of the gear train.
 
 ## Gotchas that already cost us time
 
@@ -229,9 +249,47 @@ bigger/faster moves. Not yet characterised properly; see PROGRESS.md.
   FD peripheral plus a **CAN-FD** transceiver — TCAN334G or MCP2562FD, *not*
   SN65HVD230/TJA1051, which are classic-only and will appear to work at low
   rate then fail at 5 Mbps.
-- Settling is measured in a 2% band *of the commanded step*. On steps below
-  ~0.05 rev that band is finer than the backlash and "did not settle" is an
-  artifact.
+- Settling is measured in a 2% band *of the commanded step*. The band equals the
+  backlash at **δ = 0.0319 rev = 11.5°** (not "~0.05 rev"), below which "did not
+  settle" is an artifact. **Confirmed by measurement 2026-10-18** — the flip
+  happens exactly there. The replacement absolute band (±0.36°) fixes the lower
+  end but is degenerate below δ ≈ 1.8°, where it exceeds a fifth of the step.
+  Neither criterion means anything there; report the static error floor instead.
+- **`goto`/`step` are NOT step inputs — they go through moteus's trajectory
+  generator.** Rate-limited by `vel_limit`/`accel_limit`, so measured "settling
+  time" is mostly the traverse time: 4 of 5 step sizes match `travel_time()` to
+  within 20%. **Any ζ or ω_n fitted to such a trace describes the rate limiter,
+  not the servo.** Raise both limits out of the way before claiming any dynamic
+  figure.
+- **`servo.max_velocity = 0.5` rev/s is a hard firmware cap, and it is absent
+  from `PROFILE`.** Commanding `vel_limit` above it silently does nothing.
+  Because `travel_time()` computes dwell from the *commanded* limit, `do_cycle`
+  sampled mid-flight and logged `backlash_deg` of 30°, 77° and 108° for a joint
+  whose backlash is 0.23°. It printed a warning and logged the metric anyway —
+  a test that cannot fail. Records quarantined in `host/logs/voided/`.
+- **`moteus.Register.TORQUE` is OUTPUT-side, already ×15.** Proven from the
+  board: `Kv = 330` → `Kt_rotor = 0.02894 N·m/A`, and at the 10 A limit the
+  rotor can make only 0.289 N·m, so the 0.802 N·m logged cannot be rotor-side
+  (it would need 27.7 A) but is 1.85 A output-side. **It assumes a lossless
+  gearbox**, so it is an upper bound: true output torque is `η ×` the reading.
+  Call it *lossless-referred*. Available at 10 A is 4.34 N·m — the 1.0 N·m
+  ceiling used all session was 23% of it, and only 1.9× breakaway.
+- **`CONTROL_HZ = 50` does not produce 50 Hz.** Measured 15.73 ms mean
+  (n = 1452) = **63.6 Hz**, quantised to the 15.6 ms Windows scheduler tick,
+  0.7% double ticks, worst case 31 ms. Jitter is bounded and quantised, not
+  Gaussian. Raising the rate above ~64 Hz needs a different timer, not a bigger
+  constant.
+- **The board's config is not under version control, and it has drifted.**
+  `profile_1.json` has never been committed despite this file saying "COMMIT
+  THIS" (`git log --all` finds no trace), `servopos` is ±0.55 rev on the board
+  vs ±0.25 in `PROFILE`, and `servo.max_velocity` is in no file at all. The
+  tooling to prevent this already exists and has never been used: `--sync`,
+  `--check`, `--apply`, `--dump --backup`.
+- **`do_random` and `do_cycle` save no raw samples** — they call `log_run`
+  without a `samples` argument, so only aggregates survive. 50 landing errors
+  were lost this way on 2026-10-18; percentiles, normality tests and
+  re-stratification are all impossible after the fact. Only `do_step` logs raw
+  data.
 
 ## Commands
 

@@ -17,3 +17,7 @@ ui/src-tauri/gen/
 # the intrinsics are measured data, like host/profile_1.json.
 vision/models/*.pt
 vision/shots/
+
+# stray model weights at repo root (same reason as vision/models/*.pt:
+# ~42 MB and re-downloadable)
+/*.pt

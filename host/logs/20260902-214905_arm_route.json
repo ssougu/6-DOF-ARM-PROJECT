@@ -1,0 +1,596 @@
+{
+  "timestamp": "2026-09-02T21:49:05",
+  "joints": {
+    "J1": "SimJoint",
+    "J2": "SimJoint"
+  },
+  "note": "",
+  "speed": 0.6,
+  "axes": {
+    "J1": {
+      "name": "J1 base yaw",
+      "pos_min": -0.53,
+      "pos_max": 0.53,
+      "vel_max": 0.25,
+      "accel_max": 1.0,
+      "home": 0.0
+    },
+    "J2": {
+      "name": "J2 shoulder pitch",
+      "pos_min": -0.53,
+      "pos_max": 0.53,
+      "vel_max": 0.25,
+      "accel_max": 1.0,
+      "home": 0.0
+    }
+  },
+  "steps": [
+    {
+      "op": "echo",
+      "args": "=== progressive J1 sweeps ==="
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.6
+      ]
+    },
+    {
+      "op": "home",
+      "args": []
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.4
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        1.0,
+        30.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        1.0,
+        -30.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        1.0,
+        55.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        1.0,
+        -55.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        1.0,
+        75.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        1.0,
+        -75.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        1.0,
+        0.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.5
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "=== progressive J2 sweeps ==="
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.5
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        2.0,
+        20.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        2.0,
+        -20.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        2.0,
+        35.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        2.0,
+        -35.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        2.0,
+        0.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.5
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "=== coordinated diagonals, alternating (hard reversals) ==="
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.8
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        60.0,
+        30.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.25
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -60.0,
+        -30.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.25
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        60.0,
+        -30.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.25
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -60.0,
+        30.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.25
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        60.0,
+        30.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.25
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -60.0,
+        -30.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.25
+      ]
+    },
+    {
+      "op": "home",
+      "args": []
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.5
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "=== speed ramp on a fixed sweep ==="
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        45.0,
+        20.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -45.0,
+        -20.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.6
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        45.0,
+        20.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -45.0,
+        -20.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "speed",
+      "args": [
+        1.0
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        45.0,
+        20.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -45.0,
+        -20.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "home",
+      "args": []
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.6
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "=== repeatability: 6x return to the same pose from a random-ish detour ==="
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.9
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        35.0,
+        -15.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.4
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -70.0,
+        25.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        35.0,
+        -15.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.4
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        10.0,
+        40.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        35.0,
+        -15.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.4
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -50.0,
+        -30.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        35.0,
+        -15.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.4
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        65.0,
+        10.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        35.0,
+        -15.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.4
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -20.0,
+        -40.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        35.0,
+        -15.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.6
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "=== done, home ==="
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.6
+      ]
+    },
+    {
+      "op": "home",
+      "args": []
+    }
+  ],
+  "moves": [],
+  "metrics": {
+    "moves": 0,
+    "worst_err_deg": 0.0,
+    "elapsed_s": 0.3
+  }
+}

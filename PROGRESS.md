@@ -23,6 +23,152 @@ learn / what's blocked", not a changelog (git has that).
 
 ---
 
+## 2026-10-18 — J1 characterization plan written, then its first 25% actually run
+
+**Focus:** architect a full J1 gearbox characterization campaign, then run
+whatever part of it needs no new fixtures or firmware. J1 only — no J2, no arm.
+
+**Done:**
+- **`docs/J1_CHARACTERIZATION_PLAN.md`** (new, ~1390 lines, 14 sections +
+  results, 20 figures). Every test carries its derivation. Built on three
+  principles: classify what the rotor encoder can and cannot see before quoting
+  anything; separate friction from load by direction-averaging; fit parameters
+  to whole curves rather than features.
+- **Re-analysed the existing logs before touching hardware**, which changed the
+  plan. The 0.36° and 0.84° figures are **ranges at different n**, not σ.
+  Normalising with `σ̂ = R/d₂` gives 0.097° vs 0.332° — **3.4×, not the ~2×** in
+  CLAUDE.md. At n=6 the CIs abut (±62%), so that comparison was never
+  supportable. An attempted variance decomposition yields a **negative
+  variance**, proving the terms are confounded — which is what dictated a
+  stratified repeatability design instead of post-hoc untangling.
+- **Ran on real hardware:** liveness probe, full config dump, 5 logged step
+  responses across the δ axis, a `kp_scale` sweep, and an n=50 repeatability
+  run. 11 records in `host/logs/`, 14 history rows.
+
+**Outcomes / data:**
+- **The §7.1 crossover prediction landed exactly.** Predicted that the 2%
+  relative settling band equals backlash at δ=0.0319 rev=11.5°; measured, the
+  "did not settle" artifact flips to settling precisely there.
+- **J1 does not overshoot.** Overshoot is *negative* on 4 of 5 steps (−14.8% to
+  +0.1%), 0 zero-crossings except one. The joint is overdamped (ζ≥1), so the
+  ζ≈0.80 derived from "1.6% overshoot" has no measured basis.
+- **CLAUDE.md's "1.6% overshoot, 0.17 s settle" does not reproduce.** Measured
+  settling is 0.72–1.22 s, 4–7× longer. Those figures had no logged provenance
+  (no `step` record existed); they should be deleted, not explained.
+- **Biggest methodological finding: these are not step responses.** `goto`/`step`
+  go through moteus's trajectory generator, so 4 of 5 "settling times" match
+  `travel_time()` to within 20% (ratios 0.80/0.94/1.03/0.98). We were measuring
+  the rate limiter, not the servo. No ζ or ωₙ figure is defensible until
+  `vel_limit`/`accel_limit` are raised out of the way.
+- **Open question 6 answered for free.** Inter-sample deltas show the real
+  interval is **15.6 ms (~64 Hz), not the nominal 20 ms/50 Hz** — quantised to
+  the Windows scheduler tick, every gap either 1 or 2 ticks, worst case 31 ms.
+  Bounded and well-understood, not open-ended. Also means `--rate` above ~64 Hz
+  needs a different timer, not a bigger constant.
+- **Repeatability n=50:** σ 0.2950°, mean|err| 0.2656°, ref spread 1.0162°.
+  vs August: σ 1.30× worse but **not significant** (F=1.70, p=0.21); direction
+  split collapsed 0.2283°→0.0231° (now indistinguishable from zero) but the
+  *change* is also not significant (p=0.12); reference-point σ **2.33× worse**
+  after normalising for n. Short moves now worse than long (0.307 vs 0.228°).
+- **The design figure is worse than assumed.** |μ|+2σ = **0.685° → 4.78 mm at
+  400 mm**, against the 0.36°→2.51 mm currently assumed. **1.9× worse**, because
+  0.36° was a range of 20, never a σ.
+- **`kp_scale` 2.0–4.0 settles ~3.8× faster** than the current tune (0.34–0.36 s
+  vs 1.30 s), no overshoot, no ringing, peak torque 0.80 of 1.0 N·m. Suggestive
+  only — n=1 per cell, one step size, unloaded. **Tune not changed.**
+- Config dump confirmed `cpr = 16384` (so 0.001465°/count is measured, not
+  assumed) and `pll_filter_hz = 200`.
+
+**Problems hit:**
+- **`servo.max_power_W = 100`** clips *below* the 120 W supply, and
+  `max_regen_power_W` is only 10 W. The plan had assumed the brick was the
+  ceiling; the firmware is. Caught in the config dump before any power run —
+  which is exactly the confusion the plan was written to prevent.
+- **`do_random` never saves per-move samples** (`log_run` called without
+  `samples`), and the console's stdout is a rolling buffer, so 43 of 50 landing
+  errors were unrecoverable. Only summary stats survived — no percentiles, no
+  normality test, no re-stratification. Now the top software item.
+- Bash heredocs are unreliable in this shell for large markdown; wrote files
+  directly instead.
+
+**Then, later in the session — the speed ladder, and what it exposed:**
+- **Attempted "full speed". It stopped at the first rung on a config value
+  nobody knew about:** `servo.max_velocity = 0.5` rev/s, a firmware cap that is
+  **absent from `PROFILE`**. `status` read `vel = +0.5003` then `+0.4991`,
+  pinned exactly at it. The motor is capable of 5.1 rev/s (voltage-limited) to
+  8.8 rev/s (no-load), so config was holding the joint **10–18× below
+  capability** — and we had been running at 0.25, half of even the cap.
+- **It silently corrupted 3 of 4 cycle records.** `travel_time()` computes dwell
+  from the *commanded* limit, which the firmware ignored, so `do_cycle` sampled
+  mid-flight and logged `backlash_deg` of **30.1°, 77.5° and 108.4°** for a
+  joint whose backlash is 0.23°. It printed a warning and logged the metric
+  anyway. The shortfall predicts the error exactly (0.50 s × 0.5 rev/s =
+  0.25 rev vs 0.267 observed). **Quarantined to `host/logs/voided/`** with a
+  README, and the 3 rows stripped from `j1_history.csv`. Kept rather than
+  deleted — the failure mode is itself the finding.
+- **Settled which side of the reduction `TORQUE` is reported on.** It is
+  **output-side, already ×15**. From the board: `Kv = 330` → `Kt_rotor =
+  0.02894 N·m/A`, so at the 10 A limit the rotor makes at most 0.289 N·m; the
+  0.802 N·m logged would need 27.7 A rotor-side (impossible) but 1.85 A
+  output-side. **No 15× correction needed anywhere** — but moteus assumes a
+  *lossless* gearbox, so it is an upper bound. Term adopted:
+  *lossless-referred*.
+- **The envelope was barely touched.** 1.0 N·m ceiling of 4.34 N·m available
+  (23%), peak drawn 0.802 N·m (18%), and breakaway is 0.53 N·m so the ceiling
+  was only 1.9× breakaway. At 0.25 rev/s the joint is **current-limited, not
+  power-limited** — the 100 W clip binds only above 3.67 rev/s.
+- **Root cause behind all of it: the board config is not under version
+  control.** `profile_1.json` has **never been committed** (`git log --all`
+  finds no trace) despite CLAUDE.md saying "COMMIT THIS"; `servopos` is ±0.55 on
+  the board vs ±0.25 in `PROFILE` (2.2× drift); `servo.max_velocity` is in no
+  file. The tooling to prevent this — `--sync`, `--check`, `--apply`,
+  `--dump --backup` — already exists and has never been used.
+- **Deliverables written:** `docs/J1_CHARACTERIZATION_PLAN.md` grew to ~1900
+  lines (§15 results, §16 the under-capability fix, §17 a stress-to-failure
+  protocol); `docs/J1_SESSION_REPORT_2026-10-18.md`; and `analysis/` with
+  MATLAB figure scripts, a Python mirror, and **8 rendered figures**. Palette
+  validated rather than eyeballed; two layout bugs caught by actually looking
+  at the output.
+- **Scope decision (user, this session): build it as a precision arm, fair
+  timing aside.** Output encoders are being looked into.
+
+**Still open — the honest part:**
+- `j1_figures.m` is **untested**: no MATLAB on this machine. The committed PNGs
+  came from the Python mirror; the numerics were verified independently against
+  the logs, but the MATLAB may need syntax-level fixes.
+- `docs/J1_GEARBOX_CHARACTERIZATION_PLAN.md` (written in parallel) **overlaps
+  this work and states torque is rotor-side**, which the arithmetic above
+  contradicts. The two documents need reconciling before either is shown to a
+  reviewer. Left untouched.
+- Nothing in §5 (torque constant, drag, efficiency, inertia), §6 (backlash and
+  stiffness as absolute numbers) or §9 (thermal, burn-in) has run — all blocked
+  on a fixture that does not exist. **~25% of the campaign.**
+
+**Next:**
+- **Raise `vel_limit`/`accel_limit` and re-run the δ sweep** — one command, and
+  it unblocks all of §7.
+- **`--sync` and commit `profile_1.json`**; add `servo.max_velocity` to
+  `PROFILE`; resolve the ±0.25 vs ±0.55 servopos drift.
+- **Make `do_random`/`do_cycle` save samples**, clamp `vel_limit` to
+  `servo.max_velocity` with a warning, and make `travel_time()` use the
+  effective limit.
+- Ask the ME for the planetary's allowable output torque, then set
+  `servo.max_current_A` from it (`I = τ/0.4341`) so the firmware cannot exceed
+  the gearbox rating regardless of what the host asks.
+- **Make `do_random` save samples**, then one repeat n=50 to test whether the
+  direction-split collapse is real.
+- Build the Tier 1 fixture (lever + 0.01 mm dial indicator at r=200 mm resolves
+  0.00286°, **126× finer** than the design figure). Nothing in §5 or §6 can run
+  without it.
+- Add `VOLTAGE`/`Q_CURRENT` to telemetry before any `max_torque` sweep.
+- Still untouched: all of §5 (torque/drag/efficiency/inertia), §6 (backlash and
+  stiffness as absolute numbers), §9 (thermal, burn-in). **~25% of the campaign
+  is run.**
+
+**Time:** ~1.5h   **Who:** SS + Claude
+
+---
+
 ## 2026-09-02 — first live motion from the GUI (J2); J2 degree scale was 15× off
 
 **Focus:** the GUI could only reach real hardware by relaunching with an env
