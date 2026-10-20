@@ -431,8 +431,15 @@ class Arm:
             if self.estopped:
                 raise RuntimeError("e-stopped during move")
             sts = await self.read()
+            # `fault`, NOT `fault > 0`: read() reports a stale/dead link as
+            # fault=-1, and a negative code skipped this check entirely. The
+            # same state also carries moving=False, so the settle loop below
+            # broke immediately and the move returned as ARRIVED -- in ~30 ms,
+            # with a NaN position. That is the exact silent-success the
+            # staleness stamp was added to prevent, so the two changes have to
+            # land together. Do not narrow this back to `> 0`.
             bad = {j: sts[j].fault for j in sts
-                   if sts[j].fault > 0 and not 100 <= sts[j].fault <= 104}
+                   if sts[j].fault and not 100 <= sts[j].fault <= 104}
             if bad:
                 await self.stop(f"fault {bad}")
                 raise RuntimeError(f"joint fault during move: {bad}")
