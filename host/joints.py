@@ -28,7 +28,26 @@ its own GEAR_RATIO so the units line up without the host caring.
 
 import asyncio
 import math
+import time
 from dataclasses import dataclass
+
+# How far off the commanded position a joint may sit and still count as
+# "stopped". This is a MOTION test, not an accuracy test -- a joint that has
+# finished moving but landed badly is stopped, just inaccurate.
+#
+# Sized from measurement, not guessed. The 2026-10-18 n=50 run on J1 gave
+# mu = -0.095 deg, sigma = 0.295 deg, so |mu| + 3*sigma = 0.98 deg. The old
+# value here was 2e-3 rev = 0.72 deg, which sat *below* that: roughly 2% of
+# real moves never cleared it, so `moving` never went false,
+# wait_until_stopped() burned its full timeout and Arm.move() spun to its
+# deadline. 4e-3 rev = 1.44 deg, which is 1.47x the |mu|+3*sigma bound and
+# 2.5x the worst single move observed (0.571 deg).
+#
+# Revisit if J1's repeatability changes -- see docs/J1_SESSION_REPORT_2026-10-18.md
+SETTLE_TOL_REV = 4e-3
+
+# read() reports stale telemetry as a fault after this many stream periods.
+STALE_PERIODS = 3
 
 
 @dataclass
@@ -122,6 +141,7 @@ class MoteusJoint(Joint):
         self._period = 1.0 / control_hz
         self._target = None          # (pos, vel, accel, max_torque) or None
         self._last = None            # cached moteus result
+        self._last_t = 0.0           # monotonic stamp of _last; 0 = never set
         self._faulted = 0            # non-zero -> a real fault stopped driving
         self._stream = None          # background asyncio.Task
 
@@ -178,6 +198,7 @@ class MoteusJoint(Joint):
                             kw["maximum_torque"] = mt
                         self._last = await self.controller.set_position(**kw)
                     if self._last is not None:
+                        self._last_t = time.monotonic()
                         f = int(self._last.values.get(R.FAULT, 0))
                         if f and not 100 <= f <= 104:   # 100-104 = torque limit
                             self._faulted = f
@@ -185,8 +206,11 @@ class MoteusJoint(Joint):
                 except asyncio.CancelledError:          # querying so read() works
                     raise
                 except Exception:                       # noqa: BLE001
-                    pass                                # transient; keep last
-                                                        # telemetry, retry
+                    # Transient CAN hiccup: keep the last telemetry and retry.
+                    # _last_t is deliberately NOT refreshed, so if the link is
+                    # really gone read() starts reporting a fault instead of
+                    # serving a frozen position forever.
+                    pass
 
                 await asyncio.sleep(self._period)
         except asyncio.CancelledError:
@@ -234,6 +258,7 @@ class MoteusJoint(Joint):
         self._target = None
         try:
             self._last = await self.controller.query()   # refresh cache
+            self._last_t = time.monotonic()
         except Exception:                                # noqa: BLE001
             self._last = None
         if resume:
@@ -241,6 +266,14 @@ class MoteusJoint(Joint):
 
     async def read(self) -> JointState:
         if self._streaming():
+            # The stream task swallows transient errors, so a dead CAN link
+            # would otherwise leave _last frozen and read() would keep serving
+            # a position the joint is no longer at -- with moving=False and
+            # fault=0, which Arm.move() reads as "arrived". Age it out.
+            if (self._last is None
+                    or time.monotonic() - self._last_t
+                    > STALE_PERIODS * self._period):
+                return JointState(math.nan, math.nan, False, fault=-1)
             return self._to_state(self._last)
         try:
             result = await asyncio.wait_for(self.controller.query(),
@@ -259,7 +292,7 @@ class MoteusJoint(Joint):
         moving = (abs(vel) > 1e-3) or (
             self._last_cmd is not None
             and not math.isnan(pos)
-            and abs(pos - self._last_cmd) > 2e-3
+            and abs(pos - self._last_cmd) > SETTLE_TOL_REV
         )
         return JointState(pos, vel, moving,
                           fault=int(v.get(R.FAULT, 0)),

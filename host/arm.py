@@ -283,8 +283,12 @@ class Arm:
         already_down = self.estopped and not self.armed
         self.armed = False
         self.estopped = True
+        # return_exceptions=True so this really never raises: _safe_stop only
+        # catches Exception, and a CancelledError from a joint's stop() would
+        # otherwise propagate straight out of the panic path.
         await asyncio.gather(*(self._safe_stop(j)
-                               for j in self.joints.values()))
+                               for j in self.joints.values()),
+                             return_exceptions=True)
         if not already_down:                   # stay quiet on redundant calls
             print(f"\n*** {reason.upper()} -- all joints stopped. "
                   f"'arm' to re-enable ***")
@@ -436,7 +440,15 @@ class Arm:
                 break
             await asyncio.sleep(0.03)
         else:
-            print(f"  ! move did not settle within {T * 4.0 + 5.0:.1f}s")
+            # Previously this only print()ed and then returned as though the
+            # move had succeeded -- and under Tauri print() goes to a hidden
+            # console, so a route step that never arrived advanced to the next
+            # pose in silence. A move that did not settle is a failed move.
+            late = {j: round(sts[j].position * 360, 3) for j in moving_ids
+                    if sts[j].moving or math.isnan(sts[j].position)}
+            raise RuntimeError(
+                f"move did not settle within {T * 4.0 + 5.0:.1f}s; "
+                f"still moving or unreadable: {late}")
 
         await asyncio.sleep(settle)
         return await self.read()

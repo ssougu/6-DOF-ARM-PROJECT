@@ -1902,3 +1902,41 @@ the joint is less repeatable than assumed:
 Then set `servo.max_current_A` from that number and commit it to `PROFILE`
 (§16.2), so the firmware physically cannot exceed the gearbox's rating
 regardless of what the host asks for. **That closes the loop opened in §16.4.**
+
+---
+
+## 18. Audit fixes applied — 2026-10-20
+
+A correctness audit of the host code, prompted by the 2026-10-18 session.
+Verified with `host/test_joints.py` (new, no hardware), `sim_test.py`,
+`test_arm_server.py` and a sim route. **Not yet exercised against a motor.**
+
+| # | Defect | Fix | Verified by |
+|---|---|---|---|
+| 1 | `MoteusJoint._run()` swallows every exception and `_last` had no age, so a dead CAN link left `read()` serving a frozen position with `moving=False, fault=0` — which `Arm.move()` reads as "arrived" | `_last_t` stamp; `read()` returns `fault=-1` after `STALE_PERIODS` (3) periods, and recovers when the link returns | `test_joints.py` [1] |
+| 2 | Settle tolerance was `2e-3` rev = 0.72°, **below** the joint's own measured \|μ\|+2σ of 0.685°, so ~2% of real moves never reported `moving=False` | `SETTLE_TOL_REV = 4e-3` (1.44°), 1.47× the \|μ\|+3σ bound, derived from the n=50 data | `test_joints.py` [2] |
+| 3 | `Arm.move()` only `print()`ed on settle-timeout then returned as success — and `print()` is invisible under Tauri | raises `RuntimeError` naming the joints still moving | sim route |
+| 4 | `Arm.stop()` documented "never raises" but `_safe_stop` catches only `Exception` | `gather(..., return_exceptions=True)` | inspection |
+| 5 | `do_random`/`do_cycle` saved no per-move rows — 50 landing errors were lost | `log_run(table=...)` writes `<stamp>_rows.csv`; both now pass one | console smoke test |
+| 6 | `do_cycle` warned about truncated moves then logged `backlash_deg` anyway | refuses to emit `backlash_deg`, records `invalid` + `truncated_targets` instead | console smoke test |
+| 7 | `travel_time()` used the *commanded* velocity while firmware enforced a lower cap | `effective_vel()` clamps to `servo.max_velocity`; `limit vel` warns when the command exceeds it | console smoke test — the 2 rev/s dwell now predicts **3.05 s, not 1.33 s**, which is exactly the shortfall that corrupted three runs |
+| 8 | `log_run` captured only `servo.pid*`/`servopos`/`motor_position*`, so the limits that actually bind were never recorded | full config minus the multi-thousand-entry cogging/compensation tables | console smoke test |
+| 9 | `servo.max_velocity` was on the board and in no file | added to `PROFILE` **at the board's actual value (0.5)** and to `CONFIG_LIMITS` so `set` can write it | inspection |
+| 10 | Telemetry logged only `(t, pos, vel, torque)` | appended `q_current`, `voltage`, `temperature`, `commanded_rev`; `write_csv` handles narrow and wide rows | console smoke test |
+
+**Deliberately not changed:**
+
+- **`servo.max_velocity` was recorded, not raised.** Making the limit visible
+  was the defect; changing it is a hardware decision (§16.3 derives 1.5 rev/s
+  from the regen cap). `PROFILE` now carries 0.5 with that reasoning in a
+  comment, so `--check` reports drift instead of silence.
+- **The `servopos` ±0.25 vs ±0.55 drift is flagged, not reconciled.** Widening
+  or narrowing soft travel stops is a safety decision. The comment in `PROFILE`
+  says so; `--check` will keep flagging it until someone decides.
+- **`profile_1.json` still does not exist** — `--sync` needs the board, so it
+  must be run at the bench.
+
+**One correction the test forced on me:** the comment justifying
+`SETTLE_TOL_REV` originally claimed "~1.5× the 3-sigma bound". It is 1.47×.
+The assertion failed, and the right fix was to make the comment precise rather
+than inflate the constant to fit a round number.

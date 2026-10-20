@@ -42,11 +42,32 @@ _K = GEAR_RATIO ** 2
 PROFILE = {
     "motor_position.rotor_to_output_ratio": round(1.0 / GEAR_RATIO, 7),
 
+    # !! UNRESOLVED DRIFT (found 2026-10-18): the board reports +/-0.55 rev,
+    # this profile says +/-0.25 -- a 2.2x discrepancy on the travel limits,
+    # with no record of which is intended or when it changed. Deliberately
+    # NOT reconciled here: widening or narrowing soft travel stops is a
+    # safety decision, not a cleanup. Decide, then set it in one place.
+    # Until then `--check` will flag it, which is the point.
     "servopos.position_min": JOINT_MIN_REV,
     "servopos.position_max": JOINT_MAX_REV,
 
     "servo.default_velocity_limit": 0.25,      # output rev/s
     "servo.default_accel_limit": 1.0,          # output rev/s^2
+
+    # HARD cap, separate from default_velocity_limit above: the firmware
+    # silently ignores any commanded velocity_limit greater than this. It was
+    # on the board at 0.5 but in no file, so nobody knew -- and on 2026-10-18
+    # it truncated three cycle runs that were then logged as valid data.
+    # Recorded here at the board's ACTUAL value so --check reports drift.
+    #
+    # Raising it is a deliberate decision, not a default. The reasoned
+    # ceiling is ~1.5 rev/s: that is where braking power meets
+    # max_regen_power_W below (1 N.m x 1.5 rev/s = 9.4 W vs the 10 W cap),
+    # and it makes a 90 deg move take 0.35 s instead of 1.00 s. The motor
+    # itself could do 5.1 rev/s (voltage-limited) / 8.8 (no-load), but regen
+    # has nowhere to go on a mains brick. See docs/J1_CHARACTERIZATION_PLAN.md
+    # section 16.3.
+    "servo.max_velocity": 0.5,                 # output rev/s
 
     "servo.max_current_A": 10.0,
     "servo.max_power_W": 100.0,

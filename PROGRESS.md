@@ -23,6 +23,62 @@ learn / what's blocked", not a changelog (git has that).
 
 ---
 
+## 2026-10-20 — host-code audit: ten fixes, all for silent-wrong-data defects
+
+**Focus:** review the code behind the 2026-10-18 measurements and fix what
+would let a wrong number look like a right one. Both delegated reviews failed
+on a session rate limit, so this was done directly.
+
+**Done — 10 fixes, see `docs/J1_CHARACTERIZATION_PLAN.md` §18 for the table:**
+- **Stale telemetry now ages out.** `MoteusJoint._run()` swallows every
+  exception by design, and `_last` had no timestamp — so a dead CAN link left
+  `read()` serving a frozen position with `moving=False, fault=0`, which
+  `Arm.move()` reads as *arrived*. Now stamped and aged to `fault=-1` after 3
+  periods, recovering when the link returns.
+- **The settle tolerance was below the joint's own landing error.** `2e-3` rev
+  = 0.72° vs the measured |μ|+2σ of 0.685° — ~2% of real moves never reported
+  `moving=False`, so `wait_until_stopped()` burned its 30 s timeout. Now
+  `SETTLE_TOL_REV = 4e-3` (1.44°), derived from the n=50 data.
+- **A move that never settles now raises** instead of printing to a console
+  Tauri hides and returning as success.
+- `do_random`/`do_cycle` **save per-move rows**; `do_cycle` **refuses to emit
+  `backlash_deg`** from truncated moves; `travel_time()` uses the **effective**
+  velocity; `log_run` captures the **full config**; telemetry gained
+  `q_current`, `voltage`, `temperature`, `commanded_rev`.
+
+**Outcomes / data:**
+- New `host/test_joints.py` — fake controller, no hardware. Both high-severity
+  fixes verified including recovery after the link returns.
+- `sim_test.py` PASS, `test_arm_server.py` **ARM SERVER OK**, sim route clean.
+- The `travel_time` fix reproduces the exact failure: a 2 rev/s dwell now
+  predicts **3.05 s instead of 1.33 s** — the 0.5 s shortfall that truncated
+  three cycle runs and logged a 108° backlash.
+- Audit also **cleared** several suspicions: `read()` is correctly guarded
+  against competing queries, `disable()` de-energizes before dropping the
+  reference, and `Arm.stop()` covers built-but-disabled joints.
+
+**Problems hit:**
+- **Both code reviews failed** — the cloud agent hit a session rate limit
+  (HTTP 429) seconds in and produced nothing; the earlier fork never reported.
+- My own comment justifying `SETTLE_TOL_REV` claimed "~1.5× the 3σ bound"; the
+  test said 1.47×. Fixed the comment rather than inflating the constant.
+
+**Deliberately not done:**
+- `servo.max_velocity` **recorded at 0.5, not raised** — visibility was the
+  defect; raising it is a hardware call (§16.3 derives 1.5 rev/s from regen).
+- `servopos` ±0.25 vs ±0.55 drift **flagged, not reconciled** — travel stops
+  are a safety decision.
+- `profile_1.json` still absent; `--sync` needs the board.
+- Nothing verified against a real motor yet.
+
+**Next:**
+- At the bench: `--sync`, commit `profile_1.json`, decide the servopos value,
+  then re-run the δ sweep with `vel_limit`/`accel_limit` raised.
+- Reconcile `docs/J1_GEARBOX_CHARACTERIZATION_PLAN.md` — still contradicts the
+  output-side torque finding.
+
+**Time:** ~1h   **Who:** SS + Claude
+
 ## 2026-10-18 — J1 characterization plan written, then its first 25% actually run
 
 **Focus:** architect a full J1 gearbox characterization campaign, then run

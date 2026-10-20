@@ -54,6 +54,7 @@ MODE_NAMES = {
 # Config keys the 'set'/'limits' commands know about, with sane bounds so a
 # fat-fingered value cannot quietly become a hardware problem.
 CONFIG_LIMITS = {
+    "servo.max_velocity": (0.0, 10.0),      # output rev/s; firmware hard cap
     "servo.max_current_A": (0.0, 30.0),
     "servo.max_power_W": (0.0, 500.0),
     "servo.max_voltage": (10.0, 44.0),
@@ -141,11 +142,23 @@ async def control_loop(controller, state):
             if state.last is not None:
                 v = state.last.values
                 if state.log is not None:
+                    # New fields are APPENDED so existing positional access
+                    # (s[1] = position, s[3] = torque) keeps working.
+                    # q_current is the only directly measured electrical
+                    # quantity here -- torque is derived from it via a
+                    # nameplate Kt and assumes a lossless gearbox. voltage
+                    # matters because bus droop reads as a torque ceiling
+                    # that is not the joint's.
                     state.log.append((
                         time.monotonic(),
                         v.get(moteus.Register.POSITION, math.nan),
                         v.get(moteus.Register.VELOCITY, math.nan),
-                        v.get(moteus.Register.TORQUE, math.nan)))
+                        v.get(moteus.Register.TORQUE, math.nan),
+                        v.get(moteus.Register.Q_CURRENT, math.nan),
+                        v.get(moteus.Register.VOLTAGE, math.nan),
+                        v.get(moteus.Register.TEMPERATURE, math.nan),
+                        state.position if state.mode in ("hold", "goto")
+                        else math.nan))
                 f = int(v.get(moteus.Register.FAULT, 0))
                 if f in LIMIT_REASONS:
                     state.limit_seen.add(f)
@@ -451,9 +464,38 @@ async def do_step(controller, state, delta, dwell=2.0):
             "ringing": ringing}
 
 
+def firmware_vel_cap(state):
+    """`servo.max_velocity` from the cached config, or None if unknown.
+
+    The firmware silently ignores any velocity_limit above this. It is a
+    separate parameter from servo.default_velocity_limit and is NOT in
+    joint_setup_v2.PROFILE, so it can sit on the board unrecorded -- it was
+    0.5 rev/s on J1 and nobody knew.
+    """
+    try:
+        cap = float((state.cfg or {}).get("servo.max_velocity"))
+    except (TypeError, ValueError):
+        return None
+    return cap if cap > 0 else None
+
+
+def effective_vel(state):
+    """The velocity the joint will ACTUALLY reach: commanded, capped."""
+    cap = firmware_vel_cap(state)
+    v = state.vel_limit
+    return min(v, cap) if cap is not None else v
+
+
 def travel_time(state, distance):
-    """Trapezoidal estimate: ramp up, cruise, ramp down, plus settle."""
-    v, acc = max(state.vel_limit, 1e-6), max(state.accel_limit, 1e-6)
+    """Trapezoidal estimate: ramp up, cruise, ramp down, plus settle.
+
+    Uses the EFFECTIVE velocity. Computing this from the commanded limit
+    while the firmware enforced a lower one is what truncated the
+    2026-10-18 cycle runs: the dwell was 0.50 s short, the joint was still
+    0.25 rev from its target when sampled, and the shortfall was logged as
+    backlash.
+    """
+    v, acc = max(effective_vel(state), 1e-6), max(state.accel_limit, 1e-6)
     d = abs(distance)
     if d <= v * v / acc:                 # never reaches cruise speed
         t = 2.0 * math.sqrt(d / acc)
@@ -497,8 +539,10 @@ async def do_cycle(controller, state, a, b, n, dwell=None):
     if not all(lands.values()):
         print("  no complete trips recorded -- nothing to report")
         return
+    truncated = []
     for tgt, vals in lands.items():
         if vals and abs(statistics.fmean(vals) - tgt) > abs(b - a) * 0.05:
+            truncated.append(tgt)
             print(f"  !! target {tgt:+.4f}: mean landing is far off. Either "
                   f"the dwell is too short\n     for this distance, or the "
                   f"joint is hitting something. Try a longer dwell:\n"
@@ -518,15 +562,30 @@ async def do_cycle(controller, state, a, b, n, dwell=None):
                 statistics.fmean(v - tgt for v in vals), 6)
             metrics[f"{tag}_spread_deg"] = round(
                 (max(vals) - min(vals)) * 360, 4)
-    if "neg_mean_err_rev" in metrics and "pos_mean_err_rev" in metrics:
+    if truncated:
+        # On 2026-10-18 three runs were truncated by an unrecorded firmware
+        # velocity cap and logged backlash_deg of 30, 77 and 108 degrees for a
+        # joint whose backlash is 0.23 deg. The warning above was printed and
+        # the metric was written anyway -- a test that warns but cannot fail.
+        # If the joint did not reach its targets, the bias IS the shortfall,
+        # not backlash, so refuse to report it.
+        metrics["invalid"] = "moves truncated -- landings far from target"
+        metrics["truncated_targets"] = " ".join(f"{t:+.4f}" for t in truncated)
+        print("\n  !! NOT reporting backlash: the joint did not reach its "
+              "targets, so the\n     mean bias is the shortfall, not "
+              "backlash. Re-run with a longer dwell.")
+    elif "neg_mean_err_rev" in metrics and "pos_mean_err_rev" in metrics:
         metrics["backlash_deg"] = round(
             abs(metrics["neg_mean_err_rev"] - metrics["pos_mean_err_rev"])
             * 360, 4)
         print(f"  implied backlash: {metrics['backlash_deg']:.3f} deg "
               f"(separation of the two biases)")
+    rows = [{"target_rev": round(tgt, 6), "trip": i + 1,
+             "landed_rev": round(v, 6), "err_deg": round((v - tgt) * 360, 4)}
+            for tgt, vals in lands.items() for i, v in enumerate(vals)]
     log_run(state, "cycle",
             {"a_rev": a, "b_rev": b, "trips": n, "dwell_s": round(dwell, 2),
-             "travel_deg": round(abs(b - a) * 360, 1)}, metrics)
+             "travel_deg": round(abs(b - a) * 360, 1)}, metrics, table=rows)
     print("\n  Spread is repeatability. Mean error is bias (backlash/droop).")
 
 
@@ -666,10 +725,18 @@ async def do_random(controller, state, n, cfg, seed=None, ref=None,
         print("  (spread here is repeatability from RANDOM approach "
               "directions --\n   the number that matters for a vision-guided "
               "grasp)")
+    rows = [{"i": r["i"], "dir": r["dir"],
+             "dist_deg": round(r["dist_deg"], 4),
+             "target_rev": round(r["target"], 6),
+             "err_deg": round(r["err_deg"], 4)} for r in results]
+    for k, landed in enumerate(ref_lands):
+        rows.append({"i": f"ref{k + 1}", "dir": "", "dist_deg": "",
+                     "target_rev": round(ref, 6) if ref is not None else "",
+                     "err_deg": round((landed - (ref or 0.0)) * 360, 4)})
     log_run(state, "random",
             {"n": n, "seed": seed, "ref_rev": ref, "min_deg": min_deg,
              "max_deg": max_deg, "lo_rev": round(lo, 4),
-             "hi_rev": round(hi, 4)}, metrics)
+             "hi_rev": round(hi, 4)}, metrics, table=rows)
 
 
 async def do_backlash(controller, state):
@@ -691,7 +758,7 @@ async def do_backlash(controller, state):
     if not s:
         print("no samples")
         return
-    dev = [(p - base, tq) for _, p, _, tq in s]
+    dev = [(smp[1] - base, smp[3]) for smp in s]   # positional: wide tuples
     loaded = [(d, t) for d, t in dev if abs(t) > 0.02]
     print(f"  max deflection  {max(abs(d) for d, _ in dev):.5f} rev "
           f"({max(abs(d) for d, _ in dev) * 360:.2f} deg)")
@@ -711,13 +778,20 @@ async def do_backlash(controller, state):
 
 
 # --------------------------------------------------------------- logging --
-def log_run(state, kind, params, metrics, samples=None, note=None):
+def log_run(state, kind, params, metrics, samples=None, note=None,
+            table=None):
     """Record a test with enough context to be meaningful months later.
 
-    Writes three things into the log directory:
-      <stamp>_j<id>_<kind>.json   metrics + the exact conditions
-      <stamp>_j<id>_<kind>.csv    raw samples, if any
-      j<id>_history.csv           one row per run, for plotting trends
+    Writes up to four things into the log directory:
+      <stamp>_j<id>_<kind>.json       metrics + the exact conditions
+      <stamp>_j<id>_<kind>.csv        raw telemetry samples, if any
+      <stamp>_j<id>_<kind>_rows.csv   per-move/per-landing rows, if any
+      j<id>_history.csv               one row per run, for plotting trends
+
+    `table` is a list of dicts -- one row per move or per landing. Without it
+    only aggregates survive, which is how the 50 individual landing errors
+    from the 2026-10-18 n=50 run were lost: no percentiles, no normality
+    test, no re-stratification after the fact. Aggregates are not data.
     """
     import csv as _csv
     import json
@@ -742,9 +816,22 @@ def log_run(state, kind, params, metrics, samples=None, note=None):
             "max_torque": state.max_torque,
             "vel_limit": state.vel_limit,
             "accel_limit": state.accel_limit,
+            # The whole board config, minus the two multi-thousand-entry
+            # lookup tables. Previously this kept only servo.pid*/servopos/
+            # motor_position*, which meant the limits that actually bind --
+            # servo.max_velocity, max_current_A, max_power_W,
+            # max_regen_power_W -- were never recorded. On 2026-10-18 an
+            # unrecorded servo.max_velocity=0.5 silently truncated three runs
+            # and they were logged as valid. A number without the limits that
+            # were in force is not a measurement.
             "configured": {k: v for k, v in (state.cfg or {}).items()
-                           if k.startswith(("servo.pid", "servopos",
-                                            "motor_position"))},
+                           if not k.startswith(("motor.cogging_dq_comp",
+                                                "motor_position.sources."
+                                                "0.compensation_table",
+                                                "motor_position.sources."
+                                                "1.compensation_table",
+                                                "motor_position.sources."
+                                                "2.compensation_table"))},
         },
         "params": params,
         "metrics": metrics,
@@ -754,6 +841,15 @@ def log_run(state, kind, params, metrics, samples=None, note=None):
     if samples:
         write_csv(str(base.with_suffix(".csv")), samples, note=stamp,
                   quiet=True)
+
+    if table:
+        cols = list(dict.fromkeys(k for r in table for k in r))
+        rows_path = d / f"{base.name}_rows.csv"
+        with open(rows_path, "w", newline="") as f:
+            w = _csv.DictWriter(f, fieldnames=cols)
+            w.writeheader()
+            for r in table:
+                w.writerow(r)
 
     hist = d / f"j{state.joint_id}_history.csv"
     row = {"timestamp": record["timestamp"], "test": kind, "note": note,
@@ -784,12 +880,19 @@ def write_csv(path, samples, note="", quiet=False):
         print("nothing to write")
         return
     t0 = samples[0][0]
+    wide = len(samples[0]) >= 8
     with open(path, "w", newline="") as f:
         if note:
             f.write(f"# {note}\n")
-        f.write("t_s,position_rev,velocity_rev_s,torque_Nm\n")
-        for t, pos, vel, tq in samples:
-            f.write(f"{t - t0:.4f},{pos:.6f},{vel:.6f},{tq:.6f}\n")
+        if wide:
+            f.write("t_s,position_rev,velocity_rev_s,torque_Nm,"
+                    "q_current_A,voltage_V,temperature_C,commanded_rev\n")
+        else:
+            f.write("t_s,position_rev,velocity_rev_s,torque_Nm\n")
+        for s in samples:
+            t = s[0] - t0
+            f.write(",".join([f"{t:.4f}"]
+                             + [f"{x:.6f}" for x in s[1:]]) + "\n")
     if not quiet:
         print(f"wrote {len(samples)} samples -> {path}")
 
@@ -1267,6 +1370,14 @@ async def console_loop(controller, state, target_id,
                                 "accel": "accel_limit"}[rest[0]], v)
                 print(f"tq={state.max_torque} vel={state.vel_limit} "
                       f"accel={state.accel_limit}")
+                if rest[0] == "vel":
+                    cap = firmware_vel_cap(state)
+                    if cap is not None and v > cap:
+                        print(f"  !! servo.max_velocity = {cap} rev/s caps "
+                              f"this. The firmware will IGNORE {v} and run at "
+                              f"{cap}.\n     Timing now assumes {cap}. To go "
+                              f"faster raise the board limit:\n"
+                              f"     set servo.max_velocity <value>")
 
             elif cmd == "watch":
                 hz = float(rest[0]) if rest else 5.0
