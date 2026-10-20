@@ -1,0 +1,252 @@
+{
+  "timestamp": "2026-10-20T10:43:14",
+  "joints": {
+    "J1": "SimJoint",
+    "J2": "SimJoint"
+  },
+  "note": "",
+  "speed": 0.3,
+  "axes": {
+    "J1": {
+      "name": "J1 base yaw",
+      "pos_min": -0.53,
+      "pos_max": 0.53,
+      "vel_max": 0.25,
+      "accel_max": 1.0,
+      "home": 0.0
+    },
+    "J2": {
+      "name": "J2 shoulder pitch",
+      "pos_min": -0.53,
+      "pos_max": 0.53,
+      "vel_max": 0.25,
+      "accel_max": 1.0,
+      "home": 0.0
+    }
+  },
+  "steps": [
+    {
+      "op": "speed",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "J1 both directions"
+    },
+    {
+      "op": "movej",
+      "args": [
+        1.0,
+        20.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.6
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        1.0,
+        -20.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.6
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        1.0,
+        0.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.4
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "J2 both directions"
+    },
+    {
+      "op": "movej",
+      "args": [
+        2.0,
+        15.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.6
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        2.0,
+        -15.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.6
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        2.0,
+        0.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.4
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "both together, slow"
+    },
+    {
+      "op": "move",
+      "args": [
+        15.0,
+        10.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.5
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -15.0,
+        -10.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.5
+      ]
+    },
+    {
+      "op": "home",
+      "args": []
+    }
+  ],
+  "moves": [
+    {
+      "step": 3,
+      "op": "movej",
+      "args": [
+        1.0,
+        20.0
+      ],
+      "err_deg": {
+        "J1": 0.0
+      }
+    },
+    {
+      "step": 5,
+      "op": "movej",
+      "args": [
+        1.0,
+        -20.0
+      ],
+      "err_deg": {
+        "J1": 0.0
+      }
+    },
+    {
+      "step": 7,
+      "op": "movej",
+      "args": [
+        1.0,
+        0.0
+      ],
+      "err_deg": {
+        "J1": 0.0
+      }
+    },
+    {
+      "step": 10,
+      "op": "movej",
+      "args": [
+        2.0,
+        15.0
+      ],
+      "err_deg": {
+        "J2": 0.0
+      }
+    },
+    {
+      "step": 12,
+      "op": "movej",
+      "args": [
+        2.0,
+        -15.0
+      ],
+      "err_deg": {
+        "J2": 0.0
+      }
+    },
+    {
+      "step": 14,
+      "op": "movej",
+      "args": [
+        2.0,
+        0.0
+      ],
+      "err_deg": {
+        "J2": 0.0
+      }
+    },
+    {
+      "step": 17,
+      "op": "move",
+      "args": [
+        15.0,
+        10.0
+      ],
+      "err_deg": {
+        "J1": 0.0,
+        "J2": 0.0
+      }
+    },
+    {
+      "step": 19,
+      "op": "move",
+      "args": [
+        -15.0,
+        -10.0
+      ],
+      "err_deg": {
+        "J1": 0.0,
+        "J2": 0.0
+      }
+    }
+  ],
+  "metrics": {
+    "moves": 8,
+    "worst_err_deg": 0.0,
+    "elapsed_s": 14.7
+  }
+}
