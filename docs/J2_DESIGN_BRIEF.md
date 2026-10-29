@@ -181,7 +181,7 @@ To finish the firmware and the kinematics, these are blocking:
 | **Mass + CG of everything distal to J2** | Sizing check and sag prediction | Nothing yet, but wanted |
 | **Is the output axis end free?** (section 2) | Decides encoder yes/no on this joint | The gearbox print |
 | **Backdriveable?** (section 4b) | Decides the homing workflow | Firmware homing routine |
-| **Travel limits** | Soft limits are currently ±190° placeholders | Safety config |
+| **Travel limits** | **Answered 2026-10-28:** no hard stops, rotates continuously. Soft limits ±190.8° are a typo / cable-wind guard only — nothing physical stops a runaway | Safety config |
 
 ---
 
