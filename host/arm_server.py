@@ -313,15 +313,29 @@ class ArmServer:
         self.log(f"route {name}: {len(steps)} steps")
 
     # ---- e-stop (never queued) -------------------------------------
-    async def _estop(self):
+    async def _estop(self, why="E-STOP"):
         self._route_stop = True
         if self._route_task is not None and not self._route_task.done():
             self._route_task.cancel()
+        # Anything requested before the stop is void. A queued 'arm' used to
+        # run straight after it and re-arm the robot; queued jogs only failed
+        # because they happened to check armed first.
+        dropped = []
+        while not self.queue.empty():
+            c, ws = self.queue.get_nowait()
+            self.queue.task_done()
+            dropped.append(c.get("cmd"))
+            await self._send(ws, {"type": "ack", "cmd": c.get("cmd"),
+                                  "ok": False, "msg": "discarded by e-stop"})
         try:
             await self.arm.stop("e-stop")
         finally:
             self.route = None
-        self.log("E-STOP -- all joints de-energized", "warn")
+        # "Stopped", not "de-energized": J1's moteus goes limp, but J2's CL57T
+        # keeps holding torque until its supply is cut.
+        self.log(f"{why} -- all motion stopped (moteus limp, steppers "
+                 f"holding)" + (f"; discarded queued {dropped}" if dropped
+                                else ""), "warn")
 
     # ---- client ----------------------------------------------------
     async def _client(self, ws, path=None):
@@ -350,6 +364,12 @@ class ArmServer:
         finally:
             self.clients.discard(ws)
             self.log(f"client disconnected ({len(self.clients)} left)")
+            # With no UI left, nobody can press E-STOP -- and a route would
+            # otherwise play on unattended. Losing the operator is a stop.
+            route_live = (self._route_task is not None
+                          and not self._route_task.done())
+            if not self.clients and (self.arm.armed or route_live):
+                await self._estop("operator link lost")
 
     async def _exit_soon(self, delay=0.25):
         """End run() after a beat, so the shutdown ack gets out first."""

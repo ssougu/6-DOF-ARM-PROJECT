@@ -97,7 +97,15 @@ class ArmLink {
 
   arm()    { this.send({ cmd: 'arm' }); }
   disarm() { this.send({ cmd: 'disarm' }); }
-  estop()  { this.send({ cmd: 'estop' }); }
+  estop() {
+    // send() drops silently when the link is down -- for E-STOP that silence
+    // reads as "stopped" when nothing was sent. Say so, loudly.
+    if (!this.#ws || this.#ws.readyState !== WebSocket.OPEN) {
+      this.#err('E-STOP NOT SENT -- no link to the arm server. Cut motor power.');
+      return;
+    }
+    this.send({ cmd: 'estop' });
+  }
   home()   { this.send({ cmd: 'home' }); }
   enable(id: number)  { this.send({ cmd: 'enable_joint', id }); }
   disable(id: number) { this.send({ cmd: 'disable_joint', id }); }

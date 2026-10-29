@@ -47,7 +47,10 @@ class Axis:
 
 # J1: profile_1.json servopos is +/-0.55; keep a 0.02 rev margin for overshoot.
 #     vel/accel from servo.default_velocity_limit / default_accel_limit.
-# J2: the firmware's posMin/posMax and velLimit/accelLimit.
+# J2: 25:1 cycloidal, fitted 2026-10-28. No hard stops -- it turns
+#     continuously -- so firmware's +/-0.55 is a typo/cable-wind guard, not a
+#     mechanical limit; same 0.02 margin. 0.25 rev/s output = 375 rpm /
+#     12.5 k steps/s at the motor.
 DEFAULT_AXES = {
     1: Axis("J1 base yaw",       -0.53, 0.53, 0.25, 1.0),
     2: Axis("J2 shoulder pitch", -0.53, 0.53, 0.25, 1.0),
@@ -178,6 +181,7 @@ class Arm:
         self.note = note
         self.armed = False
         self.estopped = False
+        self._stops = 0                    # bumped by every stop(); see arm()
         self.speed = 1.0                   # global 0..1 multiplier on vel_max
 
     # ---- joint registry --------------------------------------------
@@ -259,9 +263,17 @@ class Arm:
         if not ids:
             raise RuntimeError("no joints enabled"
                                + (" -- " + "; ".join(errs) if errs else ""))
+        stops = self._stops
         res = await asyncio.gather(
             *(self._joints[i].arm() for i in ids),
             return_exceptions=True)
+        # Arming takes ~2 s while the ESP32 boots. An e-stop in that window
+        # used to be undone here: armed=True, estopped=False, latch cleared,
+        # UI showing ARMED. The stop must win -- re-stop whatever finished
+        # arming after it, and leave the latch set.
+        if self._stops != stops:
+            await self.stop("e-stop during arm")
+            raise RuntimeError("e-stopped while arming -- 'arm' again to clear")
         for jid, r in zip(ids, res):
             if isinstance(r, Exception):
                 raise RuntimeError(f"{self.axes[jid].name}: arm failed: {r}")
@@ -275,12 +287,15 @@ class Arm:
         return errs
 
     async def hold(self):
+        if not self.armed or self.estopped:    # never re-energize past a stop
+            return
         await asyncio.gather(*(self._joints[i].hold() for i in self.active_ids),
                              return_exceptions=True)
 
     async def stop(self, reason="stop"):
         """Panic path: de-energize every joint. Never raises."""
         already_down = self.estopped and not self.armed
+        self._stops += 1
         self.armed = False
         self.estopped = True
         # return_exceptions=True so this really never raises: _safe_stop only
@@ -292,6 +307,9 @@ class Arm:
         if not already_down:                   # stay quiet on redundant calls
             print(f"\n*** {reason.upper()} -- all joints stopped. "
                   f"'arm' to re-enable ***")
+            # Stopped is not de-energized: a moteus goes limp, but a CL57T
+            # keeps holding torque until its supply is cut -- which is what
+            # keeps a gravity-loaded shoulder from dropping.
 
     @staticmethod
     async def _safe_stop(j):

@@ -123,8 +123,9 @@ python arm.py --no-j2                             # J1 only
 joint's cruise velocity is scaled to the longest move so they start and
 finish together.
 
-Soft limits (per `Axis` in `arm.py`): ±0.53 output-rev both joints, 0.25
-rev/s, 1.0 rev/s². `speed` in a route scales the velocity ceiling.
+Soft limits (per `Axis` in `arm.py`): ±0.53 output-rev (±190.8°) both
+joints, 0.25 rev/s, 1.0 rev/s². J2 has no hard stops — its limit is a
+guard against typos and cable wind-up, not a mechanical one. `speed` in a route scales the velocity ceiling.
 
 Route logs: `logs/<stamp>_arm_route.json` + `arm_history.csv`.
 
@@ -184,11 +185,13 @@ joints present. Routes run relative to the current zero.
 | `warmup.txt` | ~20 s, gentle, slow — run first each session |
 | `demo.txt` | short coordinated sequence |
 | `pick_place.txt` | ~60 s, 3× simulated pick-and-place with grab/release dwells and speed changes |
-| `workout.txt` | ~76 s — big sweeps, hard reversals, speed ramp, 6× repeatability return |
+| `workout.txt` | ~2.5 min — ±170° sweeps on both joints at full speed, hard reversals, speed ramp, 6× repeatability return |
+| `j2_ratio_check.txt` | J2 only, pauses 15 s per leg — tells a wrong ratio from dropped pulses from lash (see its header) |
 
-Angles are *output* degrees. J2 is currently a bare motor (`GEAR_RATIO=15`
-placeholder), so its shaft turns 15× the commanded angle — keep J2 numbers
-small until the gearbox and real ratio are in.
+Angles are *output* degrees. J2 is the 25:1 cycloidal (`GEAR_RATIO=25`,
+fitted 2026-10-28), so commanded degrees are real shoulder degrees. Its
+positive direction is not yet verified on the arm — check with a ±1° jog
+before any route.
 
 ---
 
@@ -223,16 +226,24 @@ starts and you switch joints on from the UI.
   vel_dps, moving, fault, voltage, temp, min/max/home_deg}` plus `{armed,
   estopped, speed, busy, route, sim}`.
 - Commands are serialised through one worker, so two clients can't interleave
-  motion. **`estop` bypasses the queue** and lands mid-move.
-- A client disconnecting does *not* stop the arm — a dropped browser tab
-  shouldn't abort a running routine, and the hardware watchdogs cover a crash.
+  motion. **`estop` bypasses the queue** and lands mid-move, and **discards
+  anything still queued** (each gets a `discarded by e-stop` nack).
+- **The last client disconnecting while armed (or mid-route) is an e-stop.**
+  Reversed 2026-10-28: this used to keep going so a dropped tab wouldn't abort
+  a routine — but the hardware watchdogs only catch a *dead* server, not a live
+  one playing a route with nobody able to press E-STOP. Other clients still
+  connected keep it running.
 
 Commands: `arm` `disarm` `estop` `home` `enable_joint {id}` `disable_joint {id}`
 `jog {id, delta_deg}` `move_to {id, deg}` `move {targets}` `zero {ids, confirm}`
 `set_speed {value}` `run_route {name}` `stop_route` `list_routes`.
 
 Test it: `python test_arm_server.py` (server must be running) — fires every
-command and asserts the state stream reflects each one.
+command and asserts the state stream reflects each one. It runs a route, so it
+writes a sim record into `logs/`; delete that row, don't `git checkout` the CSV.
+
+`python test_estop.py` (no server needed) — the e-stop races: mid-move,
+during arming, mid-route, re-arm, queued commands, latency, link lost.
 
 ---
 
@@ -276,7 +287,8 @@ Do it in this order:
    joint shows an amber knob and *"switched on — press Arm to connect"*, its
    controls are dead, and `Zero here` refuses — it is enabled but not
    connected. See the gotcha in CLAUDE.md.
-4. Place the arm at home **by hand**, then **Zero here**. J2 has no absolute
+4. Place the arm at home (by hand, or jog J2 there if the 25:1 cycloid
+   won't backdrive), then **Zero here**. J2 has no absolute
    reference; its zero is wherever it powered up, and it moves again after
    every ESP32 reset (including a reflash).
 5. Jog. Start at ±1°.
@@ -288,7 +300,7 @@ What's on screen:
 
 | | |
 |---|---|
-| **E-STOP** | top-right, always visible. Also bound to **Esc**. Latches; press *Re-arm* to clear. Red border round the whole window while latched. |
+| **E-STOP** | top-right, always visible. Also bound to **Esc**. Latches; press *Re-arm* to clear. Red border round the whole window while latched. J1 goes limp; J2's CL57T keeps holding. If the server link is down it shows **E-STOP NOT SENT** — cut power. |
 | **SIM / LIVE badge** | it is a **button**. Click it to switch modes without relaunching — SIM→LIVE asks for confirmation first, LIVE→SIM goes straight through. Greyed out mid-route, and in a browser (no Rust side to restart). |
 | **Arm / Disarm / Home** | plus a speed slider (0.05–1.0) and *Zero here* behind a confirm |
 | **Joint card** (one per joint) | ON/OFF toggle, dial with soft-limit sweep, live angle, moving/velocity/fault/volts/temp chips, jog buttons (±1/5/10°), go-to-angle box |

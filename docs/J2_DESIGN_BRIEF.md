@@ -176,7 +176,7 @@ To finish the firmware and the kinematics, these are blocking:
 
 | Item | Why we need it | Blocking |
 |---|---|---|
-| **Exact reduction ratio** (lobe + pin counts) | `GEAR_RATIO` in `firmware/j2_stepper/src/main.cpp` is still a placeholder **15**. Every J2 angle we command is wrong until this is real | Any accurate J2 motion |
+| **Exact reduction ratio** (lobe + pin counts) | **Done 2026-10-28:** 25:1 cycloidal, `GEAR_RATIO = 25` in firmware. Confirm 25 lobes / 26 pins | Any accurate J2 motion |
 | **Link length, J2 axis → J3 axis** | Forward kinematics and the whole error budget | IK, vision calibration |
 | **Mass + CG of everything distal to J2** | Sizing check and sag prediction | Nothing yet, but wanted |
 | **Is the output axis end free?** (section 2) | Decides encoder yes/no on this joint | The gearbox print |

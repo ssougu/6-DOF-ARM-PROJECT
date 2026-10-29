@@ -6,8 +6,8 @@
 # time.
 #
 # Angles are OUTPUT degrees. Tuned conservative; once you've watched a full
-# cycle, scale the pose angles up. J2 is still a bare motor (GEAR_RATIO=15
-# placeholder) so its "degrees" are 15x at the shaft -- keep J2 modest.
+# cycle, scale the pose angles up. J2 is the 25:1 cycloid (GEAR_RATIO=25),
+# no hard stops (+/-190.8 deg soft limit); sign unverified -- keep J2 modest.
 #
 #   python arm.py --j2-port COM3 --route routines/pick_place.txt
 

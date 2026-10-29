@@ -1,103 +1,108 @@
 # workout.txt -- stress routine: big sweeps, hard reversals, speed changes,
-# then a repeatability check.
+# then a repeatability check. Large and fast: up to +/-170 deg on both joints,
+# mostly at speed 1.0 (= each axis's vel_max, 0.25 rev/s = 90 deg/s).
 #
-# This is the aggressive one. Watch the first full pass before you leave it
-# running. Blank line = e-stop. Angles are OUTPUT degrees -- raise the
-# extremes only after a clean pass.
+# This is the aggressive one. Watch the first full pass with a hand on E-STOP
+# (Esc in the app). Angles are OUTPUT degrees; soft limits are +/-190.8.
+# J2 turns continuously, so its sweeps pass straight through vertical --
+# make sure nothing is in the swept volume. ~2.5 min.
+#
+# 2026-10-28: scaled up from +/-75 (J1) / +/-35 (J2) at speed 0.5-0.9.
 #
 #   python arm.py --j2-port COM3 --route routines/workout.txt
 
 echo === progressive J1 sweeps ===
-speed 0.6
+speed 1.0
 home
 wait 0.4
-movej 1  30
-wait 0.3
-movej 1 -30
-wait 0.3
-movej 1  55
-wait 0.3
-movej 1 -55
-wait 0.3
-movej 1  75
-wait 0.3
-movej 1 -75
-wait 0.3
+movej 1  60
+wait 0.2
+movej 1 -60
+wait 0.2
+movej 1  120
+wait 0.2
+movej 1 -120
+wait 0.2
+movej 1  170
+wait 0.2
+movej 1 -170
+wait 0.2
 movej 1  0
 wait 0.5
 
 echo === progressive J2 sweeps ===
-speed 0.5
-movej 2  20
-wait 0.3
-movej 2 -20
-wait 0.3
-movej 2  35
-wait 0.3
-movej 2 -35
-wait 0.3
+movej 2  60
+wait 0.2
+movej 2 -60
+wait 0.2
+movej 2  120
+wait 0.2
+movej 2 -120
+wait 0.2
+movej 2  170
+wait 0.2
+movej 2 -170
+wait 0.2
 movej 2  0
 wait 0.5
 
 echo === coordinated diagonals, alternating (hard reversals) ===
-speed 0.8
-move  60  30
-wait 0.25
-move -60 -30
-wait 0.25
-move  60 -30
-wait 0.25
-move -60  30
-wait 0.25
-move  60  30
-wait 0.25
-move -60 -30
-wait 0.25
+move  150  120
+wait 0.15
+move -150 -120
+wait 0.15
+move  150 -120
+wait 0.15
+move -150  120
+wait 0.15
+move  150  120
+wait 0.15
+move -150 -120
+wait 0.15
 home
 wait 0.5
 
 echo === speed ramp on a fixed sweep ===
-speed 0.3
-move  45  20
-wait 0.2
-move -45 -20
-wait 0.2
-speed 0.6
-move  45  20
-wait 0.2
-move -45 -20
-wait 0.2
+speed 0.4
+move  135  90
+wait 0.15
+move -135 -90
+wait 0.15
+speed 0.7
+move  135  90
+wait 0.15
+move -135 -90
+wait 0.15
 speed 1.0
-move  45  20
-wait 0.2
-move -45 -20
-wait 0.2
+move  135  90
+wait 0.15
+move -135 -90
+wait 0.15
 home
 wait 0.6
 
-echo === repeatability: 6x return to the same pose from a random-ish detour ===
-speed 0.9
-move  35 -15
+echo === repeatability: 6x return to the same pose from a big detour ===
+move  90 -60
 wait 0.4
-move -70  25
-wait 0.2
-move  35 -15
+move -150  100
+wait 0.15
+move  90 -60
 wait 0.4
-move  10  40
-wait 0.2
-move  35 -15
+move  20  150
+wait 0.15
+move  90 -60
 wait 0.4
-move -50 -30
-wait 0.2
-move  35 -15
+move -120 -150
+wait 0.15
+move  90 -60
 wait 0.4
-move  65  10
-wait 0.2
-move  35 -15
+move  170  60
+wait 0.15
+move  90 -60
 wait 0.4
-move -20 -40
-wait 0.2
-move  35 -15
+move -60 -170
+wait 0.15
+move  90 -60
 wait 0.6
 
 echo === done, home ===

@@ -1,0 +1,33 @@
+# j2_ratio_check -- why does J2 land short? (2026-10-28: ~10 deg short on 360)
+#
+# Each leg pauses 15 s so you can read the output. Put a tape flag on the
+# J2 output and a fixed mark beside it. Zero J2 first; route runs from zero.
+#
+#   leg 1  -> -180, MARK the flag position here. This is the reference.
+#   leg 2  slow +360  -> flag should be back on the mark. Note the gap (deg).
+#   leg 3  fast -360  -> flag should be back on the mark. Note the gap (deg).
+#   leg 4  slow +90   -> flag should be exactly 90 deg past the mark.
+#
+# Reading it:
+#   short ~10 on legs 2 AND 3, ~2.5 on leg 4  -> ratio is wrong (proportional)
+#       ~13.8 / ~3.5 short = 26:1, not 25:1 (lobe/pin counts settle it)
+#   leg 3 (fast) worse than leg 2 (slow)      -> pulses being dropped
+#   ~10 short on leg 4 too                    -> fixed lash/compliance, not ratio
+
+echo leg 1: going to -180 -- MARK the flag when it stops
+speed 0.2
+movej 2 -180
+wait 15
+echo leg 2: slow +360 -- measure the gap from the mark
+movej 2 180
+wait 15
+echo leg 3: fast -360 -- measure the gap from the mark
+speed 1.0
+movej 2 -180
+wait 15
+echo leg 4: slow +90 -- should be exactly 90 deg past the mark
+speed 0.2
+movej 2 -90
+wait 15
+echo done -- returning home
+home

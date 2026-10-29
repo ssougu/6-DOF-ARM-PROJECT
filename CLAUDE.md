@@ -55,8 +55,10 @@ pick it up. Reliably, repeatedly, on request.
     ├── arm_console.py          interactive console for the whole arm
     ├── arm_server.py           WebSocket control server — backend for the GUI
     ├── test_arm_server.py      exercises every server command against --sim
+    ├── test_estop.py           e-stop race tests; in-process, no server needed
     ├── sim_test.py             no-hardware smoke test: both joints, PASS/FAIL
-    ├── routines/               route files: warmup, demo, pick_place, workout
+    ├── routines/               route files: warmup, demo, pick_place, workout,
+    │                           j2_ratio_check
     ├── profile_1.json          tuned J1 config — COMMIT THIS
     └── logs/                   every test writes itself here
 ├── vision/                     perception — runs without the arm
@@ -81,7 +83,7 @@ ui/                             Tauri v2 + SvelteKit desktop control panel
 | Joint | Actuator | Driver | Link | Status |
 |---|---|---|---|---|
 | J1 base yaw | mj5208 BLDC | moteus r4.11 | CAN-FD | characterised; runs coordinated with J2 |
-| J2 shoulder pitch | 24HS40-5004D-E1000 NEMA 24 | CL57T(V4.1) | step/dir | firmware flashed; gearbox in progress |
+| J2 shoulder pitch | 24HS40-5004D-E1000 NEMA 24 + 25:1 cycloidal | CL57T(V4.1) | step/dir | on the arm 2026-10-28; sign + travel unverified |
 | J3 | **moteus + mj5208** (the spare) | moteus r4.11 | CAN-FD | decided 2026-09-01, not built |
 | J4 | **stepper** (ships with its CL57T) | CL57T | step/dir | decided 2026-09-01, not ordered |
 | J5, J6 | **FEETECH STS3215** bus servos | — | half-duplex TTL | decided 2026-09-01, unwired |
@@ -93,9 +95,10 @@ encoder), CL57T (motor's 1000-line encoder, closed loop), STS3215 (12-bit
 output encoder). Nothing in this arm is truly open-loop, which is why a
 non-real-time host is survivable.
 
-**Reductions:** J1 is 15:1 printed herringbone planetary. J2's is in progress
-(firmware `GEAR_RATIO` is **1.0** — bare motor, matching what is actually
-bolted on; set it to the real ratio when the gearbox goes on). J3–J6 not
+**Reductions:** J1 is 15:1 printed herringbone planetary. J2 is a **25:1
+single-stage cycloidal**, mounted on J1 2026-10-28 (firmware `GEAR_RATIO` =
+**25**). A single-stage cycloid reverses rotation, so J2's sign flipped when it
+went on — `INVERT_DIR` in the firmware is the one place to fix it. J3–J6 not
 designed.
 
 ### J1 — moteus r4.11 + mj5208
@@ -129,7 +132,8 @@ designed.
   firmware's existing `faulted` flag, `Q` telemetry already emits `fault=`,
   `Arm.move()` already aborts on `fault > 0`, and the GUI already renders it.
   **One wire, ~3 lines of firmware, zero host changes.**
-- **ESP32 firmware flashed 2026-08-31, on COM3.** The firmware reports its
+- **ESP32 firmware last flashed 2026-10-28 (25:1, ±0.55 rev), on COM3** —
+  confirm with `esptool verify_flash` against `.pio/build`, not by assumption. The firmware reports its
   *commanded* position, so host-side J2 tracking error always reads 0.00. That
   number is fabricated — see the honesty gotcha below.
 
@@ -231,6 +235,20 @@ millimetres, because the only encoder sits upstream of the gear train.
   `enable(id)` explicitly. Cost a bench session in 2026-09-02: J2 showed a
   green ON toggle, dead controls, and "no enabled joints to zero" about a
   joint that was enabled. The UI now distinguishes the two states.
+- **The e-stop lost three races until 2026-10-28** — all silent. A stop during
+  the ~2 s arm (ESP32 boot) was undone when arming finished; commands queued
+  before E-STOP ran after it (a queued `arm` re-armed); and with the UI link
+  down the button sent nothing and said nothing. Also: losing the last UI
+  client while armed is now itself an e-stop. `test_estop.py` covers each.
+  *Stopped ≠ de-energized:* J1 goes limp, J2's CL57T keeps holding torque.
+- **`test_arm_server.py` writes into the real `host/logs/`** (it runs a route).
+  Clean up by removing exactly its row from `arm_history.csv` — never
+  `git checkout` the CSV: on 2026-10-28 that erased a real workout's row
+  (restored from its JSON).
+- **The J2 step generator ignored `accelLimit` until 2026-10-28.** It
+  integrated velocity once per `loop()` pass, not per step, so it hit vMax
+  almost instantly. Invisible on a bare motor at 500 steps/s; at 25:1 it is a
+  velocity step to 12.5 k steps/s with an arm attached. Now updated per step.
 - **A firmware constant describing planned hardware will read as a broken
   sensor.** `GEAR_RATIO` sat at the intended 15 while a bare motor was on the
   bench, so every commanded angle came out 15× too big. Constants must track
@@ -314,6 +332,7 @@ $env:ARM_UI_SIM=0; npm run tauri dev              # LIVE hardware
 # or backend alone + browser at localhost:1420:
 python host/arm_server.py --sim                   # ws://127.0.0.1:8787
 python host/test_arm_server.py                    # protocol test suite
+python host/test_estop.py                         # e-stop races, no server needed
 
 # vision (needs no arm, no camera for the self-check)
 cd vision
@@ -373,12 +392,16 @@ first line — type motion commands one at a time.
    itself, so this is not silent drift — but the host has no independent
    measurement, and the reported error is fabricated (see gotchas). Wiring ALM
    closes most of this gap for one wire.
-5. **J2 `GEAR_RATIO` must track what is physically fitted.** It is now `1.0`
-   (bare motor — the shaft *is* the output, so the convention holds). It sat
-   at a planned-but-unfitted 15 through the 2026-09-02 bench session, which
-   made every commanded angle come out 15× too big and read as a broken
-   degree scale. **Set it to the real ratio and reflash the moment the
-   gearbox goes on** — from tooth counts, not hand rotation.
+5. **J2 on the arm: sign is unverified.** `GEAR_RATIO` is now 25
+   (cycloidal fitted 2026-10-28; confirm 25 lobes / 26 pins). J2 has **no
+   hard stops** and turns continuously, so its ±198° firmware / ±190.8° host
+   limit is a typo and cable-wind guard, not a mechanical one — nothing
+   physical stops a runaway. Still to do on the bench: a ±1° jog to fix the
+   sign (`INVERT_DIR`), and check whether the cycloid backdrives (if not,
+   homing is "jog to home, then zero", not "place by hand").
+   ⚠️ The 25:1 build was not on the ESP32 until 2026-10-28 evening — the
+   first live run used ratio-1 firmware and turned 1/25 of the command.
+   `verify_flash` against `.pio/build` settles which build is on the board.
 6. **Windows is permanent; timing jitter is still uncharacterised.** Decided
    2026-09-01 — no Linux migration. This is survivable because every actuator
    closes its own loop and the host is only a trajectory sequencer, but the

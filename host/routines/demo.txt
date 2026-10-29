@@ -1,7 +1,7 @@
 # demo -- coordinated J1 + J2 motion, gentle and symmetric.
 #
-# J2 angles are kept small: its zero and sign are placeholders until the
-# shoulder gearbox exists and the joint is homed. Before running this on
+# J2 angles are kept small: the 25:1 cycloid is on, but J2's zero is
+# wherever it was zeroed and its sign is unverified on the arm. Before running this on
 # hardware, in arm_console.py:  place the arm at home by hand, then
 #   zero all yes
 #

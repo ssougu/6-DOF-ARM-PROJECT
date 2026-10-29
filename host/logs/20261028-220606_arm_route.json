@@ -1,0 +1,709 @@
+{
+  "timestamp": "2026-10-28T22:06:06",
+  "joints": {
+    "J1": "MoteusJoint",
+    "J2": "StepperJoint"
+  },
+  "note": "",
+  "speed": 1.0,
+  "axes": {
+    "J1": {
+      "name": "J1 base yaw",
+      "pos_min": -0.53,
+      "pos_max": 0.53,
+      "vel_max": 0.25,
+      "accel_max": 1.0,
+      "home": 0.0
+    },
+    "J2": {
+      "name": "J2 shoulder pitch",
+      "pos_min": -0.53,
+      "pos_max": 0.53,
+      "vel_max": 0.25,
+      "accel_max": 1.0,
+      "home": 0.0
+    }
+  },
+  "steps": [
+    {
+      "op": "echo",
+      "args": "--- cycle start, home ---"
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.8
+      ]
+    },
+    {
+      "op": "home",
+      "args": []
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.5
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "reach to pick side (fast travel)"
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.85
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -45.0,
+        -10.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "descend into pick (slow, precise)"
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.25
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -45.0,
+        -28.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.8
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "lift (slow)"
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -45.0,
+        -8.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "traverse to place side (fast, big direction change)"
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.9
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        50.0,
+        -8.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "line up over place (medium)"
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.45
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        50.0,
+        -18.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "lower into place (slow)"
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.22
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        50.0,
+        -30.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.8
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "retract (slow) then home (fast)"
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        50.0,
+        -12.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.85
+      ]
+    },
+    {
+      "op": "home",
+      "args": []
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.8
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "--- cycle 2 ---"
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.85
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -45.0,
+        -10.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.25
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -45.0,
+        -28.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.8
+      ]
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -45.0,
+        -8.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.9
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        50.0,
+        -8.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.22
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        50.0,
+        -30.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.8
+      ]
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.85
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        50.0,
+        -12.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.3
+      ]
+    },
+    {
+      "op": "home",
+      "args": []
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.8
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "--- cycle 3, faster ---"
+    },
+    {
+      "op": "speed",
+      "args": [
+        1.0
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -45.0,
+        -10.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.35
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -45.0,
+        -28.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.6
+      ]
+    },
+    {
+      "op": "speed",
+      "args": [
+        1.0
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        -45.0,
+        -8.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        50.0,
+        -8.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.35
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        50.0,
+        -30.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.6
+      ]
+    },
+    {
+      "op": "speed",
+      "args": [
+        1.0
+      ]
+    },
+    {
+      "op": "move",
+      "args": [
+        50.0,
+        -12.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "home",
+      "args": []
+    },
+    {
+      "op": "echo",
+      "args": "--- done ---"
+    }
+  ],
+  "moves": [
+    {
+      "step": 7,
+      "op": "move",
+      "args": [
+        -45.0,
+        -10.0
+      ],
+      "err_deg": {
+        "J1": 0.95,
+        "J2": -0.001
+      }
+    },
+    {
+      "step": 11,
+      "op": "move",
+      "args": [
+        -45.0,
+        -28.0
+      ],
+      "err_deg": {
+        "J1": -0.066,
+        "J2": -0.001
+      }
+    },
+    {
+      "step": 15,
+      "op": "move",
+      "args": [
+        -45.0,
+        -8.0
+      ],
+      "err_deg": {
+        "J1": -0.066,
+        "J2": 0.001
+      }
+    },
+    {
+      "step": 19,
+      "op": "move",
+      "args": [
+        50.0,
+        -8.0
+      ],
+      "err_deg": {
+        "J1": -0.122,
+        "J2": 0.001
+      }
+    },
+    {
+      "step": 23,
+      "op": "move",
+      "args": [
+        50.0,
+        -18.0
+      ],
+      "err_deg": {
+        "J1": -0.117,
+        "J2": 0.0
+      }
+    },
+    {
+      "step": 27,
+      "op": "move",
+      "args": [
+        50.0,
+        -30.0
+      ],
+      "err_deg": {
+        "J1": -0.117,
+        "J2": -0.002
+      }
+    },
+    {
+      "step": 31,
+      "op": "move",
+      "args": [
+        50.0,
+        -12.0
+      ],
+      "err_deg": {
+        "J1": -0.117,
+        "J2": -0.002
+      }
+    },
+    {
+      "step": 38,
+      "op": "move",
+      "args": [
+        -45.0,
+        -10.0
+      ],
+      "err_deg": {
+        "J1": -0.154,
+        "J2": -0.001
+      }
+    },
+    {
+      "step": 41,
+      "op": "move",
+      "args": [
+        -45.0,
+        -28.0
+      ],
+      "err_deg": {
+        "J1": -0.154,
+        "J2": -0.001
+      }
+    },
+    {
+      "step": 44,
+      "op": "move",
+      "args": [
+        -45.0,
+        -8.0
+      ],
+      "err_deg": {
+        "J1": -0.148,
+        "J2": 0.001
+      }
+    },
+    {
+      "step": 47,
+      "op": "move",
+      "args": [
+        50.0,
+        -8.0
+      ],
+      "err_deg": {
+        "J1": -0.067,
+        "J2": 0.001
+      }
+    },
+    {
+      "step": 50,
+      "op": "move",
+      "args": [
+        50.0,
+        -30.0
+      ],
+      "err_deg": {
+        "J1": -0.067,
+        "J2": -0.002
+      }
+    },
+    {
+      "step": 53,
+      "op": "move",
+      "args": [
+        50.0,
+        -12.0
+      ],
+      "err_deg": {
+        "J1": -0.062,
+        "J2": -0.002
+      }
+    },
+    {
+      "step": 59,
+      "op": "move",
+      "args": [
+        -45.0,
+        -10.0
+      ],
+      "err_deg": {
+        "J1": -0.154,
+        "J2": -0.001
+      }
+    },
+    {
+      "step": 62,
+      "op": "move",
+      "args": [
+        -45.0,
+        -28.0
+      ],
+      "err_deg": {
+        "J1": -0.148,
+        "J2": -0.001
+      }
+    },
+    {
+      "step": 65,
+      "op": "move",
+      "args": [
+        -45.0,
+        -8.0
+      ],
+      "err_deg": {
+        "J1": -0.148,
+        "J2": 0.001
+      }
+    },
+    {
+      "step": 67,
+      "op": "move",
+      "args": [
+        50.0,
+        -8.0
+      ],
+      "err_deg": {
+        "J1": -0.117,
+        "J2": 0.001
+      }
+    },
+    {
+      "step": 70,
+      "op": "move",
+      "args": [
+        50.0,
+        -30.0
+      ],
+      "err_deg": {
+        "J1": -0.117,
+        "J2": -0.002
+      }
+    },
+    {
+      "step": 73,
+      "op": "move",
+      "args": [
+        50.0,
+        -12.0
+      ],
+      "err_deg": {
+        "J1": -0.111,
+        "J2": -0.002
+      }
+    }
+  ],
+  "metrics": {
+    "moves": 19,
+    "worst_err_deg": 0.95,
+    "elapsed_s": 36.4
+  }
+}

@@ -70,9 +70,10 @@
       <b>Switch to LIVE hardware?</b>
       <p>
         Commands will drive the real J1 (moteus) and J2 (stepper). Before
-        moving anything: put the arm at its home pose by hand and
+        moving anything: put the arm at its home pose and
         <em>Zero here</em> &mdash; J2 has no absolute reference, so its zero is
-        wherever it powered up.
+        wherever it powered up. J2's 25:1 cycloid may not backdrive: if it
+        won't move by hand, jog it to home in 1&deg; steps instead.
       </p>
       <div class="row">
         <button class="danger" onclick={() => go(false)}>Yes, go live</button>

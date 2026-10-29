@@ -31,21 +31,30 @@ const int DIR_PIN = 33;
 
 const long  MICROSTEPS_PER_MOTOR_REV = 2000;   // must match SW1-SW4
 
-// Output revs per motor rev. The host speaks OUTPUT units, so this must match
+// Motor revs per output rev. The host speaks OUTPUT units, so this must match
 // the hardware actually bolted on RIGHT NOW, not the hardware we plan to fit.
 //
-//   1.0  = bare motor, no gearbox  <-- current state of J2
-//   N    = the fitted reducer's ratio, from TOOTH COUNTS (hand-rotating the
-//          output to measure it gave a false 11.14:1 against a true 15:1)
+//   25.0 = single-stage cycloidal, 25:1   <-- fitted 2026-10-28, J2 on J1
+//   1.0  = bare motor, no gearbox
 //
-// Leaving this at a planned-but-unfitted 15 made every commanded angle come
-// out 15x too big at the shaft, which reads as a broken degree scale.
-// *** Set this to the real ratio when J2's gearbox goes on, and reflash. ***
-const float GEAR_RATIO               = 1.0;
+// Take it from LOBE/PIN COUNTS (reduction = N_lobes when N_pins = N_lobes+1),
+// never hand rotation -- that gave a false 11.14:1 against J1's true 15:1.
+// Leaving a planned-but-unfitted ratio here made every commanded angle come
+// out that many times too big at the shaft, which reads as a broken scale.
+const float GEAR_RATIO               = 25.0;
+
+// A single-stage cycloid turns its output OPPOSITE to its input, so the
+// positive direction flipped when the gearbox went on. Flip this if +deg
+// moves the shoulder the wrong way -- it is the only place sign lives.
+const bool  INVERT_DIR               = false;
 
 const float STEPS_PER_OUTPUT_REV = MICROSTEPS_PER_MOTOR_REV * GEAR_RATIO;
 
 // ---------------- soft limits (output rev) ----------------
+// +/-0.55 rev = +/-198 deg. J2 has no hard stops and can turn continuously,
+// so +/-180 covers every pose; this bound is not mechanical. It stops a typo
+// from commanding many turns and winding the motor + encoder cables round
+// the joint. Same bound as J1.
 float posMin = -0.55;
 float posMax =  0.55;
 
@@ -73,7 +82,7 @@ inline long  revToSteps(float r) { return lround(r * STEPS_PER_OUTPUT_REV); }
 void emitStep(int dirSign) {
   static int lastDir = 0;
   if (dirSign != lastDir) {
-    digitalWrite(DIR_PIN, dirSign > 0 ? HIGH : LOW);
+    digitalWrite(DIR_PIN, (dirSign > 0) != INVERT_DIR ? HIGH : LOW);
     delayMicroseconds(5);            // manual wants >=2us DIR setup
     lastDir = dirSign;
   }
@@ -95,7 +104,7 @@ void telemetry(const char *prefix) {
                 prefix,
                 stepsToRev(stepPos),
                 curVel / STEPS_PER_OUTPUT_REV,
-                (stepPos != stepTarget) ? 1 : 0,
+                (stepPos != stepTarget || curVel != 0) ? 1 : 0,
                 armed ? 1 : 0,
                 faulted ? 1 : 0);
 }
@@ -160,39 +169,46 @@ void handleLine(String line) {
 }
 
 // ---------------- motion, non-blocking ----------------
+// Velocity is updated ONCE PER STEP, as v^2 = v0^2 +/- 2a (one step of
+// distance). The previous version integrated a += a*dt on every loop()
+// pass -- tens of thousands per second -- so it hit vMax almost instantly
+// and accelLimit was never honoured. Harmless on a bare motor at 500
+// steps/s; at 25:1 that is a velocity step to 12.5 k steps/s with an arm
+// on the output, which a closed-loop CL57T answers with a following-error
+// fault, or worse, doesn't.
 void motionUpdate() {
   long remaining = stepTarget - stepPos;
-
-  if (remaining == 0) {
-    curVel = 0;
-    return;
-  }
-
-  int dirSign = (remaining > 0) ? 1 : -1;
-  float vMax = velLimit   * STEPS_PER_OUTPUT_REV;   // steps/s
-  float aMax = accelLimit * STEPS_PER_OUTPUT_REV;   // steps/s^2
-
-  // distance needed to stop from current speed
-  float vAbs = fabs(curVel);
-  float decelDist = (vAbs * vAbs) / (2.0f * aMax);
-
-  // integrate velocity over one step period
-  float dt = (curVel != 0) ? (1.0f / vAbs) : (1.0f / sqrtf(2.0f * aMax));
-
-  if (labs(remaining) <= (long)decelDist) {
-    vAbs -= aMax * dt;                  // decelerate into the target
-  } else {
-    vAbs += aMax * dt;                  // accelerate / cruise
-  }
-  vAbs = constrain(vAbs, aMax * 0.001f, vMax);
-  curVel = vAbs * dirSign;
+  if (remaining == 0 && curVel == 0) return;
 
   unsigned long now = micros();
-  if ((long)(now - nextStepUs) >= 0) {
-    emitStep(dirSign);
-    unsigned long interval = (unsigned long)(1e6f / vAbs);
-    nextStepUs = now + interval;
+  if ((long)(now - nextStepUs) < 0) return;
+
+  float aMax  = accelLimit * STEPS_PER_OUTPUT_REV;     // steps/s^2
+  float vMax  = velLimit   * STEPS_PER_OUTPUT_REV;     // steps/s
+  float vStep = fminf(sqrtf(2.0f * aMax), vMax);       // one step from rest
+  float vAbs  = fabsf(curVel);
+  int   toTgt = (remaining > 0) - (remaining < 0);
+  int   dir   = (curVel > 0) - (curVel < 0);
+
+  if (dir == 0) {                                      // start from rest
+    dir  = toTgt;
+    vAbs = vStep;
+  } else if (dir != toTgt || vAbs > vMax ||
+             labs(remaining) <= (long)(vAbs * vAbs / (2.0f * aMax))) {
+    // reversing, past the target, over a lowered limit, or inside the
+    // stopping distance: brake at aMax rather than stop dead
+    vAbs = sqrtf(fmaxf(vAbs * vAbs - 2.0f * aMax, 0.0f));
+    if (vAbs < vStep) {
+      if (dir != toTgt) { curVel = 0; return; }        // stopped; turn around
+      vAbs = vStep;                                    // creep the last steps
+    }
+  } else {
+    vAbs = fminf(sqrtf(vAbs * vAbs + 2.0f * aMax), vMax);
   }
+
+  emitStep(dir);
+  curVel = (stepPos == stepTarget && vAbs <= vStep) ? 0 : vAbs * dir;
+  nextStepUs = now + (unsigned long)(1e6f / vAbs);
 }
 
 // ---------------- main ----------------

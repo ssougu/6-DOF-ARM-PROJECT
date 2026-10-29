@@ -23,6 +23,65 @@ learn / what's blocked", not a changelog (git has that).
 
 ---
 
+## 2026-10-28 (late) — e-stop hardened; workout scaled up; J2 lands ~10° short of 360
+
+**Focus:** e-stop audit, a bigger/faster workout, J2 undershoot.
+**Done:**
+- E-stop: a stop during arming now stays latched; queued commands are
+  discarded; the UI says loudly when E-STOP could not be sent; the last client
+  disconnecting while armed e-stops. SimJoint moves are now interruptible, so
+  the sim can actually test this. New `host/test_estop.py` — 16/16 pass.
+- `workout.txt`: ±170° on both joints, speed 1.0 throughout (was ±75/±35° at
+  0.5–0.9). ~2.5 min. Speed above 90°/s needs `vel_max` raised — deferred.
+- `j2_ratio_check.txt`: separates wrong ratio / dropped pulses / lash.
+**Outcomes / data:**
+- Bench runs tonight, all J1+J2 live (worst err is **J1 only** — J2's is
+  fabricated, see CLAUDE.md; each figure is one run, not a statistic):
+  old workout 0.507°; new ±170° workout ×3: 0.588°, 0.61°, 0.654°;
+  pick_place ×2: 0.95°, 0.176°. The new workout runs clean at 135.5–136.8 s.
+- `j2_ratio_check` ran at 21:53 (4 moves, 100.9 s). The flag gaps were read
+  by eye and are **not recorded** — the log cannot hold them.
+- J2: 360° commanded → ~350° observed (2.8%). 26:1 would give 346°. Not yet
+  diagnosed — run the check route before changing anything.
+**Problems hit:**
+- Cleaning sim logs with `git checkout` erased the real run's history row;
+  rebuilt from its JSON.
+- The mjcanfd-usb wedged in the Windows driver (unkillable process holding
+  COM7); replugging fixed it.
+**Next:**
+- Write down the `j2_ratio_check` gaps; get lobe/pin counts from the ME.
+- Confirm Esc on hardware once (the e-stop changes are sim-tested only).
+- Decide: keep "last client gone = e-stop" (reversed a documented decision).
+**Time:** ~1.5h   **Who:** Claude
+
+---
+
+## 2026-10-28 — J2 25:1 cycloidal integrated in code (not yet run on hardware)
+
+**Focus:** J2's physical gearbox is mounted on J1; make firmware, host and GUI match.
+**Done:**
+- Firmware `GEAR_RATIO` 1.0 → 25; added `INVERT_DIR` (a single-stage cycloid
+  reverses rotation). J2 turns continuously (no hard stops), so limits stay
+  ±0.55 fw / ±0.53 host as a typo + cable-wind guard. GUI reads them from
+  the snapshot. Live-mode warning and docs now say to jog home if J2 won't backdrive.
+- Fixed the step generator: it applied acceleration once per `loop()` pass, not
+  per step, so `accelLimit` was never honoured.
+**Outcomes / data:**
+- Firmware builds. Offline replay of the new profile: 90° lands exactly in
+  1.24 s (ideal trapezoid 1.25 s), peak accel at the 1.0 rev/s² limit, and a
+  mid-move retarget brakes and reverses cleanly. Peak 12.5 k steps/s.
+- `sim_test.py` PASS, `test_arm_server.py` OK, every route stays in the new limits.
+**Problems hit:**
+- First live run "didn't rotate enough": the ESP32 had never been flashed,
+  so it ran ratio-1 code (1/25 of the command). `verify_flash` showed the
+  mismatch; flashed and verified.
+**Next:**
+- ±1° jog to verify the sign; measure travel and replace the limits;
+  check backdrive; confirm 25 lobes / 26 pins.
+**Time:** ~1h   **Who:** Claude
+
+---
+
 ## 2026-10-20 — host-code audit: ten fixes, all for silent-wrong-data defects
 
 **Focus:** review the code behind the 2026-10-18 measurements and fix what

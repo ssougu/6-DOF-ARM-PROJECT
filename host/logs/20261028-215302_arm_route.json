@@ -1,0 +1,174 @@
+{
+  "timestamp": "2026-10-28T21:53:02",
+  "joints": {
+    "J1": "MoteusJoint",
+    "J2": "StepperJoint"
+  },
+  "note": "",
+  "speed": 0.2,
+  "axes": {
+    "J1": {
+      "name": "J1 base yaw",
+      "pos_min": -0.53,
+      "pos_max": 0.53,
+      "vel_max": 0.25,
+      "accel_max": 1.0,
+      "home": 0.0
+    },
+    "J2": {
+      "name": "J2 shoulder pitch",
+      "pos_min": -0.53,
+      "pos_max": 0.53,
+      "vel_max": 0.25,
+      "accel_max": 1.0,
+      "home": 0.0
+    }
+  },
+  "steps": [
+    {
+      "op": "echo",
+      "args": "leg 1: going to -180 -- MARK the flag when it stops"
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        2.0,
+        -180.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        15.0
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "leg 2: slow +360 -- measure the gap from the mark"
+    },
+    {
+      "op": "movej",
+      "args": [
+        2.0,
+        180.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        15.0
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "leg 3: fast -360 -- measure the gap from the mark"
+    },
+    {
+      "op": "speed",
+      "args": [
+        1.0
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        2.0,
+        -180.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        15.0
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "leg 4: slow +90 -- should be exactly 90 deg past the mark"
+    },
+    {
+      "op": "speed",
+      "args": [
+        0.2
+      ]
+    },
+    {
+      "op": "movej",
+      "args": [
+        2.0,
+        -90.0
+      ]
+    },
+    {
+      "op": "wait",
+      "args": [
+        15.0
+      ]
+    },
+    {
+      "op": "echo",
+      "args": "done -- returning home"
+    },
+    {
+      "op": "home",
+      "args": []
+    }
+  ],
+  "moves": [
+    {
+      "step": 3,
+      "op": "movej",
+      "args": [
+        2.0,
+        -180.0
+      ],
+      "err_deg": {
+        "J2": 0.0
+      }
+    },
+    {
+      "step": 6,
+      "op": "movej",
+      "args": [
+        2.0,
+        180.0
+      ],
+      "err_deg": {
+        "J2": 0.0
+      }
+    },
+    {
+      "step": 10,
+      "op": "movej",
+      "args": [
+        2.0,
+        -180.0
+      ],
+      "err_deg": {
+        "J2": 0.0
+      }
+    },
+    {
+      "step": 14,
+      "op": "movej",
+      "args": [
+        2.0,
+        -90.0
+      ],
+      "err_deg": {
+        "J2": 0.0
+      }
+    }
+  ],
+  "metrics": {
+    "moves": 4,
+    "worst_err_deg": 0.0,
+    "elapsed_s": 100.9
+  }
+}

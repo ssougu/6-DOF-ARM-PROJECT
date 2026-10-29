@@ -445,9 +445,21 @@ class SimJoint(Joint):
         if not self.quiet:
             print(f"  [sim] {self.name}: {self.position:+.4f} -> "
                   f"{position:+.4f} rev ({dt:.2f}s)")
-        await asyncio.sleep(dt)
-        self.position = position
+        # Sleep in slices so stop() lands mid-move, as on real hardware. One
+        # long sleep ran every move to completion through an e-stop, so the
+        # sim could never show whether the e-stop worked.
+        start, t0 = self.position, time.monotonic()
         self._target = position
+        while True:
+            frac = min(1.0, (time.monotonic() - t0) / dt) if dt > 0 else 1.0
+            if not self._armed:                    # stopped: freeze in place
+                self.position = start + (position - start) * frac
+                self._target = self.position
+                break
+            if frac >= 1.0:
+                self.position = position
+                break
+            await asyncio.sleep(0.01)
         return await self.read()
 
     async def read(self) -> JointState:

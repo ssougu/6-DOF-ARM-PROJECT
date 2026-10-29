@@ -18,7 +18,7 @@ python host/sim_test.py          # try the motion stack right now, no hardware
 | Joint | Actuator | Driver | Link | State |
 |---|---|---|---|---|
 | **J1** base yaw | mj5208 BLDC | moteus r4.11 | CAN-FD | ✅ built, tuned, characterised |
-| **J2** shoulder pitch | 24HS40 NEMA 24 | CL57T (closed loop) | step/dir | ⚙ motor + firmware working, gearbox in design |
+| **J2** shoulder pitch | 24HS40 NEMA 24 + 25:1 cycloidal | CL57T (closed loop) | step/dir | ✅ on the arm 2026-10-28; lands ~2.8% short, under diagnosis |
 | **J3** | moteus + mj5208 | moteus r4.11 | CAN-FD | 📋 decided, not built |
 | **J4** | stepper | CL57T | step/dir | 📋 decided, not ordered |
 | **J5 / J6** | FEETECH STS3215 | — | half-duplex TTL | 📋 on hand, unwired |
@@ -133,7 +133,11 @@ Layered, because a printed arm with a 4 N·m motor deserves it:
 - **Hardware watchdogs, 0.25 s** on both the moteus and the ESP32 firmware — if
   the host goes quiet, the joints de-energise on their own.
 - **E-STOP everywhere** — blank line at a console prompt, **Esc** in the GUI,
-  latching until explicitly re-armed.
+  latching until explicitly re-armed. It wins every race: a stop during arming
+  stays latched, commands queued before it are discarded, and the GUI says so
+  loudly if it could not be sent. Losing the last GUI connection while armed is
+  itself an e-stop. *Stopped* means J1 goes limp and J2 holds position.
+  `host/test_estop.py` covers each case.
 - **Soft limits** enforced host-side before any command is sent.
 - **The GUI defaults to simulation**; hardware is opt-in via `ARM_UI_SIM=0`.
 - **The control server dies with its UI** — it polls its parent process and
@@ -154,9 +158,11 @@ host/                    Python control stack (runs on the laptop)
   arm_server.py          WebSocket control server (GUI backend)
   sim_test.py            no-hardware smoke test
   test_arm_server.py     server protocol test suite
+  test_estop.py          e-stop race tests, no server needed
   joint_setup_v2.py      moteus calibration + config
   joint_console_v2.py    single-joint tuning & characterisation
-  routines/              motion files: warmup, demo, pick_place, workout
+  routines/              motion files: warmup, demo, pick_place, workout,
+                         j2_ratio_check
   logs/                  every test writes itself here
 
 firmware/j2_stepper/     ESP32 — moteus-like serial protocol, trapezoidal motion
@@ -196,7 +202,8 @@ Every run logs per-move landing error to `logs/arm_history.csv`.
 |---|---|
 | `warmup.txt` | ~20 s, gentle — run first each session |
 | `pick_place.txt` | ~60 s, 3× simulated pick-and-place with grab/release dwells |
-| `workout.txt` | ~76 s — big sweeps, hard reversals, speed ramp, repeatability block |
+| `workout.txt` | ~2.5 min — ±170° sweeps on both joints at full speed, hard reversals, speed ramp, repeatability block |
+| `j2_ratio_check.txt` | J2 diagnostic: separates wrong ratio / dropped pulses / lash |
 
 ---
 
